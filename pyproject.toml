@@ -1,0 +1,16 @@
+[project]
+name = "ecommerce-visual-agentic-workflow"
+version = "0.3.0"
+description = "Ecommerce Visual Agentic Workflow MVP (Phase 0 + Live Gen + Live QA + Feishu)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+# Pillow improves simulated_live placeholders; not required
+images = ["Pillow>=10.0.0"]
+
+[project.scripts]
+evaw = "evaw.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["evaw*"]
