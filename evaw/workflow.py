@@ -885,6 +885,157 @@ def scenario_feishu_demo(
     log.add(f"[trace] {log.status_trace(task)}")
     return task, log, ref
 
+
+def scenario_hitl_chat_demo(
+    engine: "WorkflowEngine",
+    *,
+    feishu=None,
+    hitl_dir: str = "artifacts/hitl_pending",
+) -> tuple:
+    """High-risk path → PendingReview; Feishu chat instructions; NO auto-approve.
+
+    Cici / Lead applies decision later via:
+      python3 -m evaw.cli hitl-apply --task <id> --decision approve|reject
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from .feishu import (
+        FeishuBriefPayload,
+        describe_feishu_adapter,
+        resolve_feishu_adapter,
+    )
+    from .schema import STRUCTURE_SENSITIVE, QAOverall, TaskStatus
+    from .task_store import save_task
+
+    adapter = feishu or resolve_feishu_adapter()
+    engine.feishu = adapter
+    engine.config.audit_sample_rate = 0.0
+    engine.rng = random.Random(0)
+
+    log = RunLog()
+    log.add("=== SCENARIO: hitl_chat_demo (停在 PendingReview，等人审) ===")
+    log.add(f"[feishu] {describe_feishu_adapter(adapter)}")
+
+    deadline = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    brief = FeishuBriefPayload(
+        brand_id="brand_xiu",
+        sku_id="SKU-BED-STRUCT",
+        platform="jd",
+        asset_type="hero",
+        selling_points=["结构真实", "侧板完整", "客房场景"],
+        size_spec="800x800",
+        deadline_iso=deadline,
+        is_new_product=True,
+        risk_flags=[STRUCTURE_SENSITIVE],
+        requester_id="ops_hitl_chat",
+        source_message_id="mock_src_hitl_chat",
+        chat_id=None,
+    )
+
+    ref = adapter.create_task_from_brief(brief)
+    log.add(
+        f"[feishu:create_task_from_brief] intake={ref.intake_id} "
+        f"adapter={ref.adapter} path={ref.mock_path}"
+    )
+
+    ops = ref.ops
+    task = engine.create_task(ops, log)
+    adapter.bind_task_id(ref, task.task_id)
+    _feishu_notify(
+        engine,
+        task,
+        log,
+        prev=None,
+        note="提需已建 VisualTask（人审聊天 demo）",
+        extra={"intake_id": ref.intake_id},
+    )
+
+    prev = task.status
+    engine.run_strategy(task, ops, log)
+    _feishu_notify(engine, task, log, prev=prev, note="Brief & Strategy 完成")
+
+    prev = task.status
+    if not engine.bind_and_gate_knowledge(task, log):
+        _feishu_notify(engine, task, log, prev=prev, note="Knowledge 阻断")
+        path = save_task(task, hitl_dir)
+        log.add(f"[hitl:store] saved={path} (knowledge blocked)")
+        log.add(f"=== DONE status={task.status.value} (blocked) ===")
+        log.add(f"[trace] {log.status_trace(task)}")
+        return task, log, ref
+
+    _feishu_notify(engine, task, log, prev=prev, note="Knowledge ready")
+
+    prev = task.status
+    if not engine.run_generation(task, log):
+        _feishu_notify(engine, task, log, prev=prev, note="Generation failed")
+        path = save_task(task, hitl_dir)
+        log.add(f"[hitl:store] saved={path}")
+        log.add(f"=== DONE status={task.status.value} ===")
+        return task, log, ref
+    _feishu_notify(engine, task, log, prev=prev, note="Generation → QA")
+
+    prev = task.status
+    decision = engine.run_qa(task, log, overall=QAOverall.PASS_WITH_RISK)
+    _feishu_notify(
+        engine,
+        task,
+        log,
+        prev=prev,
+        note=f"QA {QAOverall.PASS_WITH_RISK.value}",
+        extra={"hitl_reasons": decision.reasons},
+    )
+
+    prev = task.status
+    engine.apply_hitl_gate(task, decision, log)
+    _feishu_notify(
+        engine,
+        task,
+        log,
+        prev=prev,
+        note="HITL → PendingReview（不代审，等人）",
+    )
+
+    if task.status != TaskStatus.PENDING_REVIEW:
+        path = save_task(task, hitl_dir)
+        log.add(f"[unexpected] expected PendingReview, got {task.status.value}")
+        log.add(f"[hitl:store] saved={path}")
+        log.add(f"[trace] {log.status_trace(task)}")
+        return task, log, ref
+
+    path = save_task(task, hitl_dir)
+    log.add(f"[hitl:store] saved={path}")
+
+    tid = task.task_id
+    lines = [
+        f"[EVAW 人审待办] task_id={tid}",
+        f"状态=PendingReview  sku={task.sku_id}  QA=PassWithRisk",
+        "原因：新品 + structure_sensitive + PassWithRisk",
+        "",
+        "请人工拍板（本 demo 不会自动代审）：",
+        f"· 批准 → 在群里回复：「批准 {tid}」",
+        f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} --decision approve",
+        f"· 打回 → 在群里回复：「打回 {tid} TEXT_ERROR」（原因码可换）",
+        f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} "
+        "--decision reject --reason TEXT_ERROR",
+        "",
+        "常用原因码：FIDELITY_STRUCTURE / TEXT_ERROR / BRAND_VIOLATION / "
+        "LAYOUT_PLATFORM / BUSINESS_JUDGEMENT",
+    ]
+    chat_text = "\n".join(lines)
+    nr = adapter.send_chat_text(chat_text)
+    log.add(
+        f"[feishu:chat_hitl] channel={nr.channel} ok={nr.ok} "
+        f"msg={nr.message_id} detail={nr.detail}"
+    )
+    log.add("[hitl] STOPPED at PendingReview — waiting for human (no auto-approve)")
+    log.add(
+        f"=== DONE status={task.status.value} auto_approved={task.auto_approved} "
+        f"task_id={tid} snapshot={path} feishu={adapter.name} ==="
+    )
+    log.add(f"[trace] {log.status_trace(task)}")
+    return task, log, ref
+
+
 __all__ = [
     "WorkflowEngine",
     "WorkflowConfig",
@@ -892,4 +1043,5 @@ __all__ = [
     "IllegalTransition",
     "attach_feishu",
     "scenario_feishu_demo",
+    "scenario_hitl_chat_demo",
 ]

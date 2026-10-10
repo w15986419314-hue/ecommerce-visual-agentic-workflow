@@ -185,3 +185,24 @@ class MockFeishuAdapter(FeishuAdapter):
             console=True,
             detail=f"console_placeholder={placeholder}",
         )
+
+    def send_chat_text(self, text: str) -> NotifyResult:
+        msg_id = f"mock_msg_{uuid4().hex[:10]}"
+        payload = {
+            "message_id": msg_id,
+            "adapter": self.name,
+            "at": utcnow_iso(),
+            "kind": "chat_text",
+            "text": text,
+        }
+        line = json.dumps(payload, ensure_ascii=False)
+        with self._messages_path.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+        return NotifyResult(
+            ok=True,
+            channel="mock_file",
+            message_id=msg_id,
+            detail=f"chat_text appended to {self._messages_path}",
+            path=str(self._messages_path),
+        )
+

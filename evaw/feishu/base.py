@@ -93,6 +93,11 @@ class FeishuAdapter(ABC):
         """URL for Lead to review/approve (跳转控制台；细打回不在飞书内)."""
         ...
 
+
+    def send_chat_text(self, text: str) -> NotifyResult:
+        """Send free-form IM text (chat HITL instructions). Default: noop."""
+        return NotifyResult(ok=True, channel="noop", detail="send_chat_text not implemented")
+
     def bind_task_id(self, ref: FeishuTaskRef, task_id: str) -> FeishuTaskRef:
         ref.task_id = task_id
         return ref

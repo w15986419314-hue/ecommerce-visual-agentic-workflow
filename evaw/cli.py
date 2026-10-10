@@ -17,9 +17,43 @@ from .schema import (
     OperationsInput,
     Platform,
     QAOverall,
+    ReasonCode,
+    TaskStatus,
 )
 from .evalset_v0 import run_evalset_v0
-from .workflow import WorkflowConfig, WorkflowEngine, scenario_feishu_demo
+from .task_store import load_task, save_task
+from .workflow import (
+    RunLog,
+    WorkflowConfig,
+    WorkflowEngine,
+    scenario_feishu_demo,
+    scenario_hitl_chat_demo,
+)
+
+
+
+def _load_env_local() -> None:
+    """Load .env.local / .env into os.environ (export KEY=val or KEY=val)."""
+    import os
+
+    root = Path(__file__).resolve().parent.parent
+    for name in (".env.local", ".env"):
+        path = root / name
+        if not path.is_file():
+            continue
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+            if "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip("'").strip('"')
+            if key and key not in os.environ:
+                os.environ[key] = val
 
 
 def _deadline_days(n: int = 7) -> datetime:
@@ -81,6 +115,7 @@ SCENARIOS = (
     "feishu-demo",
     "qa-live-demo",
     "evalset-v0",
+    "hitl-chat-demo",
 )
 
 
@@ -100,6 +135,7 @@ def _make_engine(
 
 
 def run_feishu_demo(*, artifacts_dir: str = "artifacts", force_mock: bool = False) -> int:
+    _load_env_local()
     mock_root = str(Path(artifacts_dir) / "feishu_mock")
     Path(mock_root).mkdir(parents=True, exist_ok=True)
     Path(artifacts_dir, "console_placeholder").mkdir(parents=True, exist_ok=True)
@@ -169,6 +205,179 @@ def run_qa_live_demo(*, artifacts_dir: str = "artifacts", gen_mode: str = "stub"
     return code
 
 
+
+def run_hitl_chat_demo(
+    *, artifacts_dir: str = "artifacts", force_mock: bool = False
+) -> int:
+    """Run to PendingReview, notify Feishu with chat instructions, do NOT auto-approve."""
+    _load_env_local()
+    mock_root = str(Path(artifacts_dir) / "feishu_mock")
+    Path(mock_root).mkdir(parents=True, exist_ok=True)
+    hitl_dir = str(Path(artifacts_dir) / "hitl_pending")
+
+    adapter = resolve_feishu_adapter(
+        force_mock=True if force_mock else None,
+        mock_root=mock_root,
+    )
+    engine = _make_engine("stub", artifacts_dir, qa_mode="stub")
+    task, log, ref = scenario_hitl_chat_demo(
+        engine, feishu=adapter, hitl_dir=hitl_dir
+    )
+
+    print(log.dump())
+    print()
+    print(f"final_status={task.status.value}")
+    print(f"task_id={task.task_id}")
+    print(f"intake_id={ref.intake_id}")
+    print(f"auto_approved={task.auto_approved}")
+    print(f"waiting_for_human={task.status == TaskStatus.PENDING_REVIEW}")
+    print(f"hitl_snapshot={Path(hitl_dir) / (task.task_id + '.json')}")
+    print(f"feishu_adapter={adapter.name}")
+    print(f"feishu={describe_feishu_adapter(adapter)}")
+    print(f"connected={'yes' if adapter.name == 'feishu_api' else 'no (mock)'}")
+    print()
+    print("Next (human):")
+    print(
+        f"  python3 -m evaw.cli hitl-apply --task {task.task_id} --decision approve"
+    )
+    print(
+        f"  python3 -m evaw.cli hitl-apply --task {task.task_id} "
+        "--decision reject --reason TEXT_ERROR"
+    )
+    if task.status != TaskStatus.PENDING_REVIEW:
+        return 1
+    return 0
+
+
+def run_hitl_apply(
+    *,
+    task_id: str,
+    decision: str,
+    reason: str = "FIDELITY_STRUCTURE",
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = False,
+) -> int:
+    """Apply Lead approve/reject on a PendingReview snapshot; notify Feishu."""
+    _load_env_local()
+    hitl_dir = str(Path(artifacts_dir) / "hitl_pending")
+    mock_root = str(Path(artifacts_dir) / "feishu_mock")
+
+    try:
+        task = load_task(task_id, hitl_dir)
+    except FileNotFoundError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+    if task.status != TaskStatus.PENDING_REVIEW:
+        print(
+            f"Task {task_id} status={task.status.value}; "
+            "hitl-apply requires PendingReview",
+            file=sys.stderr,
+        )
+        return 1
+
+    adapter = resolve_feishu_adapter(
+        force_mock=True if force_mock else None,
+        mock_root=mock_root,
+    )
+    engine = _make_engine("stub", artifacts_dir, qa_mode="stub")
+    engine.feishu = adapter
+    log = RunLog()
+    log.add(
+        f"=== HITL APPLY decision={decision} task={task_id} "
+        f"reason={reason} ==="
+    )
+
+    prev = task.status
+    dec = (decision or "").strip().lower()
+    if dec in ("approve", "approved", "yes"):
+        accept = bool(task.qa and task.qa.overall.value == "PassWithRisk")
+        engine.lead_approve(
+            task,
+            log,
+            accept_risk=accept,
+            notes="Lead approved via Feishu chat / hitl-apply",
+        )
+        nr = adapter.notify_status(
+            task,
+            previous_status=prev,
+            note="Lead 已批准（聊天/CLI）",
+        )
+        log.add(
+            f"[feishu:notify] channel={nr.channel} ok={nr.ok} detail={nr.detail}"
+        )
+        prev = task.status
+        engine.deliver(task, log)
+        nr = adapter.notify_status(
+            task, previous_status=prev, note="Delivered after chat approve"
+        )
+        log.add(
+            f"[feishu:notify] channel={nr.channel} ok={nr.ok} detail={nr.detail}"
+        )
+        chat_lines = [
+            f"[EVAW 人审结果] {task.task_id} → Approved → Delivered",
+            f"sku={task.sku_id}（聊天/CLI 批准）",
+        ]
+        cr = adapter.send_chat_text(chr(10).join(chat_lines))
+        log.add(f"[feishu:chat] ok={cr.ok} channel={cr.channel}")
+    elif dec in ("reject", "rejected", "no"):
+        try:
+            rc = ReasonCode(reason.strip().upper())
+        except ValueError:
+            print(
+                f"Unknown reason_code={reason!r}. "
+                f"Valid: {[c.value for c in ReasonCode]}",
+                file=sys.stderr,
+            )
+            return 2
+        engine.lead_reject(
+            task,
+            log,
+            reason_code=rc,
+            notes=f"Lead rejected via Feishu chat / hitl-apply ({rc.value})",
+        )
+        nr = adapter.notify_status(
+            task,
+            previous_status=prev,
+            note=f"Lead 已打回 reason={rc.value}",
+            extra={"reason_code": rc.value},
+        )
+        log.add(
+            f"[feishu:notify] channel={nr.channel} ok={nr.ok} detail={nr.detail}"
+        )
+        chat_lines = [
+            f"[EVAW 人审结果] {task.task_id} → Rejected",
+            f"sku={task.sku_id} reason={rc.value}（聊天/CLI 打回）",
+        ]
+        cr = adapter.send_chat_text(chr(10).join(chat_lines))
+        log.add(f"[feishu:chat] ok={cr.ok} channel={cr.channel}")
+    else:
+        print(
+            f"Unknown decision={decision!r}; use approve|reject",
+            file=sys.stderr,
+        )
+        return 2
+
+    snap = save_task(task, hitl_dir)
+    log.add(f"[hitl:store] updated={snap}")
+    log.add(f"=== DONE status={task.status.value} ===")
+    log.add(f"[trace] {log.status_trace(task)}")
+
+    print(log.dump())
+    print()
+    print(f"final_status={task.status.value}")
+    print(f"task_id={task.task_id}")
+    print(f"decision={dec}")
+    if task.review:
+        print(f"review_decision={task.review.decision.value}")
+        if task.review.reason_code:
+            print(f"reason_code={task.review.reason_code.value}")
+    print(f"hitl_snapshot={snap}")
+    print(f"feishu_adapter={adapter.name}")
+    print(f"feishu={describe_feishu_adapter(adapter)}")
+    return 0
+
+
 def run_one(
     name: str,
     *,
@@ -179,6 +388,10 @@ def run_one(
 ) -> int:
     if name == "feishu-demo":
         return run_feishu_demo(
+            artifacts_dir=artifacts_dir, force_mock=force_feishu_mock
+        )
+    if name == "hitl-chat-demo":
+        return run_hitl_chat_demo(
             artifacts_dir=artifacts_dir, force_mock=force_feishu_mock
         )
     if name == "qa-live-demo":
@@ -256,6 +469,42 @@ def run_all(
 
 
 def main(argv: list[str] | None = None) -> int:
+    _load_env_local()
+    argv_list = list(argv) if argv is not None else sys.argv[1:]
+
+    # Dedicated subcommand: hitl-apply --task ... --decision ...
+    if argv_list and argv_list[0] == "hitl-apply":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli hitl-apply",
+            description="Apply Lead approve/reject on a PendingReview task",
+        )
+        p.add_argument("--task", required=True, help="task_id from hitl-chat-demo")
+        p.add_argument(
+            "--decision",
+            required=True,
+            choices=["approve", "reject"],
+            help="approve | reject",
+        )
+        p.add_argument(
+            "--reason",
+            default="FIDELITY_STRUCTURE",
+            help="ReasonCode when rejecting (default: FIDELITY_STRUCTURE)",
+        )
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--feishu-mock",
+            action="store_true",
+            help="Force Feishu mock adapter",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_hitl_apply(
+            task_id=a.task,
+            decision=a.decision,
+            reason=a.reason,
+            artifacts_dir=a.artifacts_dir,
+            force_mock=a.feishu_mock,
+        )
+
     parser = argparse.ArgumentParser(
         description=(
             "Ecommerce Visual Agentic Workflow — demo scenarios "

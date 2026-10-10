@@ -233,3 +233,33 @@ class FeishuApiAdapter(FeishuAdapter):
             console=True,
             detail=local.detail,
         )
+
+    def send_chat_text(self, text: str) -> NotifyResult:
+        """Live IM free-form text (also dual-writes to local mock trail)."""
+        local = self._local.send_chat_text(text)
+        try:
+            live = self._send_text(text)
+        except Exception as e:  # noqa: BLE001
+            return NotifyResult(
+                ok=False,
+                channel="feishu_im",
+                message_id=local.message_id,
+                detail=f"local ok; live failed: {e}",
+                path=local.path,
+            )
+        if live.channel == "noop":
+            return NotifyResult(
+                ok=True,
+                channel="noop",
+                message_id=local.message_id,
+                detail=f"{live.detail}; local={local.path}",
+                path=local.path,
+            )
+        return NotifyResult(
+            ok=live.ok,
+            channel=live.channel,
+            message_id=live.message_id or local.message_id,
+            detail=live.detail,
+            path=local.path,
+        )
+
