@@ -18,6 +18,7 @@ from .schema import (
     Platform,
     QAOverall,
 )
+from .evalset_v0 import run_evalset_v0
 from .workflow import WorkflowConfig, WorkflowEngine, scenario_feishu_demo
 
 
@@ -79,6 +80,7 @@ SCENARIOS = (
     "live-knowledge-block",
     "feishu-demo",
     "qa-live-demo",
+    "evalset-v0",
 )
 
 
@@ -181,6 +183,9 @@ def run_one(
         )
     if name == "qa-live-demo":
         return run_qa_live_demo(artifacts_dir=artifacts_dir, gen_mode=gen_mode)
+    if name == "evalset-v0":
+        code, _rows = run_evalset_v0(artifacts_dir=artifacts_dir)
+        return code
 
     # live-* scenarios always use live generation regardless of default mode
     effective_mode = gen_mode
@@ -262,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         nargs="?",
         default="all",
         choices=list(SCENARIOS),
-        help="Which path to run (default: all). qa-live-demo = Live QA rules.",
+        help="Which path to run (default: all). qa-live-demo / evalset-v0 = Live QA rules.",
     )
     parser.add_argument(
         "--live",
