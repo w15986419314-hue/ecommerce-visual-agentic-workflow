@@ -64,7 +64,7 @@ python3 -m evaw.cli evalset-v0
 
 更多：`live-happy` · `live-knowledge-block` · `feishu-demo` · `hitl-chat-demo` / `hitl-apply`（飞书聊天人审，不代审）· `--live` / `--qa-live`。
 
-飞书人审操作见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
+飞书人审（待办含五维 QA / reason_code / 候选图）见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
 
 ---
 

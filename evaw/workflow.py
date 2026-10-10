@@ -7,7 +7,12 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .agents import AssetGenerationAgent, BriefStrategyAgent, VisualQAAgent
-from .hitl import DEFAULT_AUDIT_SAMPLE_RATE, HitlDecision, evaluate_after_qa
+from .hitl import (
+    DEFAULT_AUDIT_SAMPLE_RATE,
+    HitlDecision,
+    evaluate_after_qa,
+    format_hitl_pending_chat,
+)
 from .knowledge import assert_may_generate, bind_knowledge, issue_exemption
 from .schema import (
     STRUCTURE_SENSITIVE,
@@ -1006,23 +1011,11 @@ def scenario_hitl_chat_demo(
     log.add(f"[hitl:store] saved={path}")
 
     tid = task.task_id
-    lines = [
-        f"[EVAW 人审待办] task_id={tid}",
-        f"状态=PendingReview  sku={task.sku_id}  QA=PassWithRisk",
-        "原因：新品 + structure_sensitive + PassWithRisk",
-        "",
-        "请人工拍板（本 demo 不会自动代审）：",
-        f"· 批准 → 在群里回复：「批准 {tid}」",
-        f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} --decision approve",
-        f"· 打回 → 在群里回复：「打回 {tid} TEXT_ERROR」（原因码可换）",
-        f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} "
-        "--decision reject --reason TEXT_ERROR",
-        "",
-        "常用原因码：FIDELITY_STRUCTURE / TEXT_ERROR / BRAND_VIOLATION / "
-        "LAYOUT_PLATFORM / BUSINESS_JUDGEMENT",
-    ]
-    chat_text = "\n".join(lines)
+    chat_text = format_hitl_pending_chat(
+        task, hitl_reasons=list(decision.reasons)
+    )
     nr = adapter.send_chat_text(chat_text)
+    log.add("[hitl:chat_body]\n" + chat_text)
     log.add(
         f"[feishu:chat_hitl] channel={nr.channel} ok={nr.ok} "
         f"msg={nr.message_id} detail={nr.detail}"

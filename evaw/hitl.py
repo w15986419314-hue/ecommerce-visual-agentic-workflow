@@ -105,3 +105,117 @@ def evaluate_after_qa(
         reasons=["low_risk_auto_approve"],
         next_hint="Approved",
     )
+
+
+# Chinese labels for the five QA dimensions (Feishu chat readability)
+QA_DIM_LABELS_ZH: dict[str, str] = {
+    "product_fidelity": "产品保真",
+    "brand": "品牌规范",
+    "text": "文案准确",
+    "layout": "版式/平台",
+    "mobile_readability": "移动端可读",
+}
+
+
+def _hitl_risk_summary(task: VisualTask, hitl_reasons: Optional[list[str]] = None) -> str:
+    """One-line why this task stopped for human review."""
+    bits: list[str] = []
+    if task.is_new_product:
+        bits.append("新品")
+    if STRUCTURE_SENSITIVE in (task.risk_flags or []):
+        bits.append("结构敏感")
+    if task.knowledge_status == KnowledgeStatusEnum.EXEMPTED or task.exemption_ticket_id:
+        bits.append("知识豁免")
+    if task.qa and task.qa.overall == QAOverall.PASS_WITH_RISK:
+        bits.append("QA=PassWithRisk")
+    elif hitl_reasons and "qa_pass_with_risk" in hitl_reasons:
+        bits.append("QA=PassWithRisk")
+    if hitl_reasons and "audit_sampled" in hitl_reasons:
+        bits.append("抽检审计")
+    if not bits:
+        bits.append("强制人审闸门")
+    return " + ".join(bits)
+
+
+def format_hitl_pending_chat(
+    task: VisualTask,
+    *,
+    hitl_reasons: Optional[list[str]] = None,
+) -> str:
+    """Rich Feishu PendingReview message: QA five dims, reason_code, candidates, risk.
+
+    Used by hitl-chat-demo so Lead can see what they are approving/rejecting.
+    """
+    tid = task.task_id
+    qa = task.qa
+    overall = qa.overall.value if qa else "—"
+    reason = qa.reason_code.value if qa and qa.reason_code else "—"
+    risk_line = _hitl_risk_summary(task, hitl_reasons)
+
+    lines: list[str] = [
+        f"[EVAW 人审待办] task_id={tid}",
+        f"状态=PendingReview  sku={task.sku_id}  platform={task.platform.value}",
+        f"风险说明：{risk_line}（系统不代审，需你拍板）",
+        "",
+        f"QA overall={overall}  reason_code={reason}"
+        + (f"  primary={qa.primary_dimension}" if qa and qa.primary_dimension else ""),
+    ]
+
+    # Five-dimensional detail
+    if qa and qa.dimensions:
+        lines.append("五维 QA：")
+        order = [
+            "product_fidelity",
+            "brand",
+            "text",
+            "layout",
+            "mobile_readability",
+        ]
+        seen: set[str] = set()
+        for key in order + [k for k in qa.dimensions if k not in order]:
+            if key in seen or key not in qa.dimensions:
+                continue
+            seen.add(key)
+            dr = qa.dimensions[key]
+            label = QA_DIM_LABELS_ZH.get(key, key)
+            note = (dr.notes or "").strip()
+            if len(note) > 72:
+                note = note[:69] + "…"
+            lines.append(f"  · {label}({key})={dr.status.value} — {note or '—'}")
+        if qa.suggested_fixes:
+            lines.append("建议修复：")
+            for fix in qa.suggested_fixes[:3]:
+                lines.append(f"  · {fix}")
+    else:
+        lines.append("五维 QA：（无报告）")
+
+    # Candidate assets
+    lines.append("")
+    if task.generation and task.generation.assets:
+        n = task.generation.candidate_count or len(task.generation.assets)
+        lines.append(f"候选图（{n}）：")
+        for i, a in enumerate(task.generation.assets, 1):
+            uri = a.uri or "—"
+            ver = a.version or "—"
+            lines.append(f"  {i}. version={ver}  uri={uri}")
+        lines.append(
+            "说明：stub/simulated 的 uri 是占位路径；正式版会附可点开的预览。"
+        )
+    else:
+        lines.append("候选图：（无）")
+
+    lines.extend(
+        [
+            "",
+            "请人工拍板（本 demo 不会自动代审）：",
+            f"· 批准 → 在群里回复：「批准 {tid}」",
+            f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} --decision approve",
+            f"· 打回 → 在群里回复：「打回 {tid} TEXT_ERROR」（原因码可换）",
+            f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} "
+            "--decision reject --reason TEXT_ERROR",
+            "",
+            "常用原因码：FIDELITY_STRUCTURE / TEXT_ERROR / BRAND_VIOLATION / "
+            "LAYOUT_PLATFORM / BUSINESS_JUDGEMENT",
+        ]
+    )
+    return "\n".join(lines)
