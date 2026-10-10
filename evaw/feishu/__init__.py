@@ -14,6 +14,9 @@ from .base import (
     NotifyResult,
 )
 from .mock import MockFeishuAdapter, brief_to_ops
+from .field_map import INTAKE_FIELDS, field_map_as_dict, payload_to_brief
+from .webhook import ingest_payload, serve_webhook
+from .bitable_setup import setup_bitable, write_field_map_doc
 
 
 def has_feishu_credentials() -> bool:
@@ -86,4 +89,11 @@ __all__ = [
     "has_feishu_credentials",
     "resolve_feishu_adapter",
     "describe_feishu_adapter",
+    "INTAKE_FIELDS",
+    "field_map_as_dict",
+    "payload_to_brief",
+    "ingest_payload",
+    "serve_webhook",
+    "setup_bitable",
+    "write_field_map_doc",
 ]

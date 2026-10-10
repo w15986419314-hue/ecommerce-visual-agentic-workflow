@@ -550,9 +550,141 @@ def run_all(
     return code
 
 
+
+def run_feishu_intake_from_json(
+    *,
+    file_path: str,
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = True,
+    notify: bool = False,
+) -> int:
+    """Ingest a Feishu form/bitable/webhook JSON payload → VisualTask."""
+    import json
+    from .feishu.webhook import ingest_payload
+
+    _load_env_local()
+    p = Path(file_path)
+    if not p.is_file():
+        print(f"File not found: {file_path}", file=sys.stderr)
+        return 2
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    try:
+        result = ingest_payload(
+            payload,
+            artifacts_dir=artifacts_dir,
+            force_mock=force_mock,
+            notify=notify,
+        )
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result.get("ok") else 1
+
+
+def run_feishu_intake_webhook(
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8787,
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = True,
+    notify: bool = False,
+) -> int:
+    """Start local HTTP stub for Feishu intake callbacks."""
+    from .feishu.webhook import serve_webhook
+
+    _load_env_local()
+    serve_webhook(
+        host=host,
+        port=port,
+        artifacts_dir=artifacts_dir,
+        force_mock=force_mock,
+        notify=notify,
+    )
+    return 0
+
+
+def run_feishu_bitable_setup(*, name: str = "EVAW 提需") -> int:
+    """Create/document Feishu bitable intake fields. Never sends IM."""
+    import json
+    from .feishu.bitable_setup import setup_bitable
+
+    _load_env_local()
+    report = setup_bitable(name=name)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("ok") else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     _load_env_local()
     argv_list = list(argv) if argv is not None else sys.argv[1:]
+
+
+    # Dedicated: feishu-intake-from-json — webhook/bitable payload → task
+    if argv_list and argv_list[0] == "feishu-intake-from-json":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-intake-from-json",
+            description=(
+                "Parse Feishu form/bitable/bot webhook JSON → create VisualTask. "
+                "Default --feishu-mock (no live IM)."
+            ),
+        )
+        p.add_argument("--file", "-f", required=True, help="JSON payload path")
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--feishu-mock",
+            action="store_true",
+            default=True,
+            help="Force mock adapter (default True)",
+        )
+        p.add_argument(
+            "--live-notify",
+            action="store_true",
+            help="Allow live Feishu adapter + IM notify (off by default)",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_feishu_intake_from_json(
+            file_path=a.file,
+            artifacts_dir=a.artifacts_dir,
+            force_mock=not a.live_notify,
+            notify=a.live_notify,
+        )
+
+    # Dedicated: feishu-intake-webhook — local HTTP stub
+    if argv_list and argv_list[0] == "feishu-intake-webhook":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-intake-webhook",
+            description="Local HTTP stub: POST /feishu/intake → VisualTask",
+        )
+        p.add_argument("--host", default="127.0.0.1")
+        p.add_argument("--port", type=int, default=8787)
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--live-notify",
+            action="store_true",
+            help="Allow live Feishu IM on intake (default: mock only)",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_feishu_intake_webhook(
+            host=a.host,
+            port=a.port,
+            artifacts_dir=a.artifacts_dir,
+            force_mock=not a.live_notify,
+            notify=a.live_notify,
+        )
+
+    # Dedicated: feishu-bitable-setup — create/document 提需多维表格
+    if argv_list and argv_list[0] == "feishu-bitable-setup":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-bitable-setup",
+            description=(
+                "Create Feishu bitable + fields if API allows; always write field map. "
+                "Does not send IM."
+            ),
+        )
+        p.add_argument("--name", default="EVAW 提需", help="Base app name")
+        a = p.parse_args(argv_list[1:])
+        return run_feishu_bitable_setup(name=a.name)
 
     # Dedicated subcommand: feishu-intake --brand ... --sku ... (form simulate)
     if argv_list and argv_list[0] == "feishu-intake":

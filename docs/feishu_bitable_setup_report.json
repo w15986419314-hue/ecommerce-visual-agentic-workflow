@@ -1,0 +1,117 @@
+{
+  "ok": true,
+  "field_map_path": "docs/feishu_intake_field_map.json",
+  "fields": [
+    {
+      "field_name": "品牌",
+      "type": 1,
+      "evaw_key": "brand_id"
+    },
+    {
+      "field_name": "SKU",
+      "type": 1,
+      "evaw_key": "sku_id"
+    },
+    {
+      "field_name": "平台",
+      "type": 3,
+      "evaw_key": "platform",
+      "property": {
+        "options": [
+          {
+            "name": "tmall"
+          },
+          {
+            "name": "jd"
+          },
+          {
+            "name": "amazon"
+          },
+          {
+            "name": "dtc"
+          }
+        ]
+      }
+    },
+    {
+      "field_name": "图型",
+      "type": 3,
+      "evaw_key": "asset_type",
+      "property": {
+        "options": [
+          {
+            "name": "hero"
+          },
+          {
+            "name": "sku"
+          },
+          {
+            "name": "pdp_module"
+          }
+        ]
+      }
+    },
+    {
+      "field_name": "卖点",
+      "type": 1,
+      "evaw_key": "selling_points"
+    },
+    {
+      "field_name": "尺寸",
+      "type": 1,
+      "evaw_key": "size_spec"
+    },
+    {
+      "field_name": "Deadline",
+      "type": 5,
+      "evaw_key": "deadline"
+    },
+    {
+      "field_name": "是否新品",
+      "type": 7,
+      "evaw_key": "is_new_product"
+    },
+    {
+      "field_name": "风险标记",
+      "type": 4,
+      "evaw_key": "risk_flags",
+      "property": {
+        "options": [
+          {
+            "name": "structure_sensitive"
+          }
+        ]
+      }
+    }
+  ],
+  "operator_fill_where": {
+    "preferred": "飞书多维表格「表单视图」分享链接（运营打开链接填表提交）",
+    "alt_bot": "飞书群内 @机器人 按字段问答 / 交互卡片",
+    "mvp_fallback": "CLI feishu-intake / feishu-intake-from-json（无公网 webhook 时）"
+  },
+  "manual_steps": [
+    "在飞书打开多维表格 → 对该数据表「生成表单」/ 新建「表单视图」",
+    "表单分享链接发给运营；运营只在该链接填字段并提交",
+    "在飞书开发者后台为应用开通 bitable 读记录 / 事件订阅（record.created）",
+    "将事件回调 URL 指到公网可达的 POST /feishu/event（或用自动化把新行 webhook 到 stub）",
+    "本地无公网时：导出一行 JSON，用 feishu-intake-from-json 建任务"
+  ],
+  "api": {
+    "create_app": {
+      "code": 99991672,
+      "msg": "Access denied: need scopes bitable:app or base:app:create (open Feishu developer console to grant)",
+      "permission_violations": [
+        {
+          "type": "action_scope_required",
+          "subject": "bitable:app"
+        },
+        {
+          "type": "action_scope_required",
+          "subject": "base:app:create"
+        }
+      ]
+    },
+    "hint": "应用可能缺少「创建多维表格 / bitable:app」权限，或需在开发者后台开通并发布。字段映射已写入 docs；可手工新建多维表后按 fields[] 建列。"
+  },
+  "mode": "document_only_api_denied"
+}

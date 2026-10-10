@@ -1,0 +1,16 @@
+{
+  "source": "feishu_bitable_form_or_webhook",
+  "fields": {
+    "品牌": "brand_xiu",
+    "SKU": "SKU-BED-FORM-001",
+    "平台": "tmall",
+    "图型": "hero",
+    "卖点": "稳固承重,快速折叠,客房场景",
+    "尺寸": "800x800",
+    "Deadline": "2026-10-17",
+    "是否新品": false,
+    "风险标记": ["structure_sensitive"]
+  },
+  "requester_id": "ops_demo_webhook",
+  "record_id": "rec_example_001"
+}

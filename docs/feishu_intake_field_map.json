@@ -1,0 +1,186 @@
+{
+  "version": "1.0",
+  "purpose": "EVAW 飞书提需字段契约（问卷 / 多维表格表单视图 / 机器人引导）",
+  "operator_fill_where": {
+    "preferred": "飞书多维表格「表单视图」分享链接（运营打开链接填表提交）",
+    "alt_bot": "飞书群内 @机器人 按字段问答 / 交互卡片",
+    "mvp_fallback": "CLI feishu-intake / feishu-intake-from-json（无公网 webhook 时）"
+  },
+  "fields": [
+    {
+      "key": "brand_id",
+      "label_zh": "品牌",
+      "aliases": [
+        "brand_id",
+        "品牌",
+        "brand",
+        "Brand"
+      ],
+      "required": true,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "brand_xiu",
+      "notes": ""
+    },
+    {
+      "key": "sku_id",
+      "label_zh": "SKU",
+      "aliases": [
+        "sku_id",
+        "SKU",
+        "sku",
+        "商品编码"
+      ],
+      "required": true,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "SKU-BED-001",
+      "notes": ""
+    },
+    {
+      "key": "platform",
+      "label_zh": "平台",
+      "aliases": [
+        "platform",
+        "平台",
+        "Platform"
+      ],
+      "required": true,
+      "field_type": "single_select",
+      "options": [
+        "tmall",
+        "jd",
+        "amazon",
+        "dtc"
+      ],
+      "bitable_type": 3,
+      "example": "tmall",
+      "notes": ""
+    },
+    {
+      "key": "asset_type",
+      "label_zh": "图型",
+      "aliases": [
+        "asset_type",
+        "图型",
+        "asset",
+        "AssetType"
+      ],
+      "required": true,
+      "field_type": "single_select",
+      "options": [
+        "hero",
+        "sku",
+        "pdp_module"
+      ],
+      "bitable_type": 3,
+      "example": "hero",
+      "notes": "hero=主图 · sku · pdp_module=详情模块"
+    },
+    {
+      "key": "selling_points",
+      "label_zh": "卖点",
+      "aliases": [
+        "selling_points",
+        "卖点",
+        "sellingPoints",
+        "卖点列表"
+      ],
+      "required": true,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "稳固承重,快速折叠,客房场景",
+      "notes": "2–5 条，逗号/分号/换行分隔；多维表也可用多选"
+    },
+    {
+      "key": "size_spec",
+      "label_zh": "尺寸",
+      "aliases": [
+        "size_spec",
+        "尺寸",
+        "size",
+        "Size"
+      ],
+      "required": true,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "800x800",
+      "notes": ""
+    },
+    {
+      "key": "deadline",
+      "label_zh": "Deadline",
+      "aliases": [
+        "deadline",
+        "Deadline",
+        "期望交付日",
+        "deadline_iso"
+      ],
+      "required": false,
+      "field_type": "datetime",
+      "options": [],
+      "bitable_type": 5,
+      "example": "2026-10-17",
+      "notes": "缺省 = 提交日 + 7 天"
+    },
+    {
+      "key": "is_new_product",
+      "label_zh": "是否新品",
+      "aliases": [
+        "is_new_product",
+        "是否新品",
+        "新品",
+        "new_product"
+      ],
+      "required": false,
+      "field_type": "checkbox",
+      "options": [],
+      "bitable_type": 7,
+      "example": "否",
+      "notes": "是 → 后续强制人审"
+    },
+    {
+      "key": "risk_flags",
+      "label_zh": "风险标记",
+      "aliases": [
+        "risk_flags",
+        "风险标记",
+        "风险",
+        "riskFlags"
+      ],
+      "required": false,
+      "field_type": "multi_select",
+      "options": [
+        "structure_sensitive"
+      ],
+      "bitable_type": 4,
+      "example": "structure_sensitive",
+      "notes": "勾 structure_sensitive → 强制人审"
+    },
+    {
+      "key": "requester_id",
+      "label_zh": "提需人",
+      "aliases": [
+        "requester_id",
+        "提需人",
+        "requester",
+        "提交人"
+      ],
+      "required": false,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "ops_feishu",
+      "notes": ""
+    }
+  ],
+  "webhook_paths": {
+    "http_stub": "POST /feishu/intake  (CLI: feishu-intake-webhook)",
+    "file_ingest": "feishu-intake-from-json --file <payload.json>",
+    "bitable_event": "record.created → map fields → create VisualTask"
+  }
+}
