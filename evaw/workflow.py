@@ -1038,3 +1038,90 @@ __all__ = [
     "scenario_feishu_demo",
     "scenario_hitl_chat_demo",
 ]
+
+
+def scenario_feishu_intake(
+    engine: "WorkflowEngine",
+    brief,
+    *,
+    feishu=None,
+    store_dir: str = "artifacts/intakes",
+) -> tuple:
+    """Minimal Feishu form intake: brief fields → VisualTask → notify.
+
+    Does NOT run strategy/gen/QA — ops submit only. Formal product uses
+    Feishu questionnaire / bot; CLI simulates the same field payload.
+    """
+    from .feishu import describe_feishu_adapter, resolve_feishu_adapter
+    from .task_store import save_task
+
+    adapter = feishu or resolve_feishu_adapter()
+    engine.feishu = adapter
+
+    log = RunLog()
+    log.add("=== FEISHU INTAKE (填表提需最小版) ===")
+    log.add(f"[feishu] {describe_feishu_adapter(adapter)}")
+    log.add(
+        f"[form] brand={brief.brand_id} sku={brief.sku_id} "
+        f"platform={brief.platform} asset={brief.asset_type} "
+        f"new={brief.is_new_product} points={len(brief.selling_points)}"
+    )
+
+    ref = adapter.create_task_from_brief(brief)
+    log.add(
+        f"[feishu:create_task_from_brief] intake={ref.intake_id} "
+        f"adapter={ref.adapter} path={ref.mock_path} "
+        f"external_ref={ref.external_ref}"
+    )
+
+    task = engine.create_task(ref.ops, log)
+    adapter.bind_task_id(ref, task.task_id)
+    # Persist task_id onto intake record when mock trail exists
+    if ref.mock_path:
+        try:
+            import json
+            from pathlib import Path
+
+            p = Path(ref.mock_path)
+            if p.is_file():
+                rec = json.loads(p.read_text(encoding="utf-8"))
+                rec["task_id"] = task.task_id
+                p.write_text(
+                    json.dumps(rec, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                log.add(f"[intake] bound task_id written → {p}")
+        except Exception as e:  # noqa: BLE001
+            log.add(f"[intake] warn could not update intake file: {e}")
+
+    log.add(f"[feishu] bound intake={ref.intake_id} → task_id={task.task_id}")
+    _feishu_notify(
+        engine,
+        task,
+        log,
+        prev=None,
+        note="飞书填表提需已建 VisualTask",
+        extra={
+            "intake_id": ref.intake_id,
+            "brand_id": brief.brand_id,
+            "sku_id": brief.sku_id,
+            "platform": brief.platform,
+            "asset_type": brief.asset_type,
+            "is_new_product": brief.is_new_product,
+        },
+    )
+
+    chat_lines = [
+        f"[EVAW 填表提需] intake={ref.intake_id} → task={task.task_id}",
+        f"brand={brief.brand_id} sku={brief.sku_id} platform={brief.platform}",
+        f"asset={brief.asset_type} size={brief.size_spec} new={brief.is_new_product}",
+        f"卖点={'；'.join(brief.selling_points)}",
+        f"status={task.status.value}（已建任务，待跑策略/生成）",
+    ]
+    cr = adapter.send_chat_text(chr(10).join(chat_lines))
+    log.add(f"[feishu:chat] ok={cr.ok} channel={cr.channel} detail={cr.detail}")
+
+    snap = save_task(task, store_dir)
+    log.add(f"[intake:store] saved={snap}")
+    log.add(f"=== DONE status={task.status.value} ===")
+    log.add(f"[trace] {log.status_trace(task)}")
+    return task, log, ref

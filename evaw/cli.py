@@ -27,6 +27,7 @@ from .workflow import (
     WorkflowConfig,
     WorkflowEngine,
     scenario_feishu_demo,
+    scenario_feishu_intake,
     scenario_hitl_chat_demo,
 )
 
@@ -132,6 +133,87 @@ def _make_engine(
             artifacts_dir=artifacts_dir,
         )
     )
+
+
+
+def run_feishu_intake(
+    *,
+    brand: str,
+    sku: str,
+    platform: str = "tmall",
+    asset_type: str = "hero",
+    selling_points: list[str] | None = None,
+    size_spec: str = "800x800",
+    deadline: str | None = None,
+    is_new_product: bool = False,
+    risk_flags: list[str] | None = None,
+    requester: str = "ops_feishu_form",
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = False,
+) -> int:
+    """Simulate Feishu form/card intake: fields → VisualTask → Feishu notify.
+
+    Formal product: Feishu questionnaire / bot collects the same fields.
+    MVP: this CLI stands in for the form submit.
+    """
+    from .feishu import FeishuBriefPayload, describe_feishu_adapter, resolve_feishu_adapter
+
+    _load_env_local()
+    mock_root = str(Path(artifacts_dir) / "feishu_mock")
+    Path(mock_root).mkdir(parents=True, exist_ok=True)
+    store_dir = str(Path(artifacts_dir) / "intakes")
+
+    points = selling_points or ["稳固承重", "快速折叠"]
+    flags = list(risk_flags or [])
+    if not deadline:
+        deadline = _deadline_days(7).isoformat()
+
+    adapter = resolve_feishu_adapter(
+        force_mock=True if force_mock else None,
+        mock_root=mock_root,
+    )
+    engine = _make_engine("stub", artifacts_dir, qa_mode="stub")
+
+    brief = FeishuBriefPayload(
+        brand_id=brand,
+        sku_id=sku,
+        platform=platform,
+        asset_type=asset_type,
+        selling_points=points,
+        size_spec=size_spec,
+        deadline_iso=deadline,
+        is_new_product=is_new_product,
+        risk_flags=flags,
+        requester_id=requester,
+        source_message_id="cli_feishu_intake",
+        chat_id=None,
+        raw={"source": "cli_feishu_intake", "simulates": "feishu_form_or_bot"},
+    )
+
+    task, log, ref = scenario_feishu_intake(
+        engine, brief, feishu=adapter, store_dir=store_dir
+    )
+
+    print(log.dump())
+    print()
+    print(f"final_status={task.status.value}")
+    print(f"task_id={task.task_id}")
+    print(f"intake_id={ref.intake_id}")
+    print(f"brand_id={brand}")
+    print(f"sku_id={sku}")
+    print(f"platform={platform}")
+    print(f"asset_type={asset_type}")
+    print(f"is_new_product={is_new_product}")
+    print(f"feishu_adapter={adapter.name}")
+    print(f"feishu={describe_feishu_adapter(adapter)}")
+    print(f"connected={'yes' if adapter.name == 'feishu_api' else 'no (mock)'}")
+    if ref.mock_path:
+        print(f"intake_path={ref.mock_path}")
+    print(f"task_snapshot={Path(store_dir) / (task.task_id + '.json')}")
+    print()
+    print("Note: MVP uses CLI to simulate Feishu form/bot field submit.")
+    print("Formal: same fields via Feishu questionnaire or bot card.")
+    return 0
 
 
 def run_feishu_demo(*, artifacts_dir: str = "artifacts", force_mock: bool = False) -> int:
@@ -471,6 +553,75 @@ def run_all(
 def main(argv: list[str] | None = None) -> int:
     _load_env_local()
     argv_list = list(argv) if argv is not None else sys.argv[1:]
+
+    # Dedicated subcommand: feishu-intake --brand ... --sku ... (form simulate)
+    if argv_list and argv_list[0] == "feishu-intake":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-intake",
+            description=(
+                "Simulate Feishu form/card brief submit → create VisualTask → notify. "
+                "Formal product uses Feishu questionnaire / bot with the same fields."
+            ),
+        )
+        p.add_argument("--brand", required=True, help="brand_id (品牌)")
+        p.add_argument("--sku", required=True, help="sku_id (SKU)")
+        p.add_argument(
+            "--platform",
+            default="tmall",
+            choices=["tmall", "jd", "amazon", "dtc"],
+            help="平台 (default: tmall)",
+        )
+        p.add_argument(
+            "--asset-type",
+            default="hero",
+            choices=["hero", "sku", "pdp_module"],
+            help="图型 (default: hero)",
+        )
+        p.add_argument(
+            "--selling-points",
+            default="稳固承重,快速折叠",
+            help="卖点，逗号分隔 (default: 稳固承重,快速折叠)",
+        )
+        p.add_argument("--size", default="800x800", help="尺寸规格 (default: 800x800)")
+        p.add_argument(
+            "--deadline",
+            default=None,
+            help="Deadline ISO date/datetime; default = now+7d",
+        )
+        p.add_argument(
+            "--new-product",
+            action="store_true",
+            help="是否新品（是 → 后续强制人审）",
+        )
+        p.add_argument(
+            "--risk-flags",
+            default="",
+            help="风险标记，逗号分隔（如 structure_sensitive）",
+        )
+        p.add_argument("--requester", default="ops_feishu_form", help="提需人 id")
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--feishu-mock",
+            action="store_true",
+            help="Force Feishu mock adapter (do not send live IM)",
+        )
+        a = p.parse_args(argv_list[1:])
+        points = [s.strip() for s in a.selling_points.split(",") if s.strip()]
+        flags = [s.strip() for s in a.risk_flags.split(",") if s.strip()]
+        return run_feishu_intake(
+            brand=a.brand,
+            sku=a.sku,
+            platform=a.platform,
+            asset_type=a.asset_type,
+            selling_points=points,
+            size_spec=a.size,
+            deadline=a.deadline,
+            is_new_product=a.new_product,
+            risk_flags=flags,
+            requester=a.requester,
+            artifacts_dir=a.artifacts_dir,
+            force_mock=a.feishu_mock,
+        )
 
     # Dedicated subcommand: hitl-apply --task ... --decision ...
     if argv_list and argv_list[0] == "hitl-apply":
