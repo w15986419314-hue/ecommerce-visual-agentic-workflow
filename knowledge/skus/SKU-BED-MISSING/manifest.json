@@ -1,0 +1,20 @@
+{
+  "sku_id": "SKU-BED-MISSING",
+  "brand_id": "brand_xiu",
+  "status": "missing",
+  "aliases": ["sku-bed-missing"],
+  "title": "知识缺失演示款（故意不 ready）",
+  "category": "folding_bed",
+  "has_vis": false,
+  "has_structure": false,
+  "has_platform_spec": false,
+  "missing_items": [
+    "product_structure_refs",
+    "vis_brand_tokens",
+    "platform_safe_zone_tmall"
+  ],
+  "vis_ref": null,
+  "structure_ref": null,
+  "platform_refs": [],
+  "notes": "Used by CLI knowledge-block / live-knowledge-block — do not mark ready"
+}

@@ -1,9 +1,19 @@
-"""Knowledge Constraint layer (NOT an Agent) — Architecture §3 / §G2."""
+"""Knowledge Constraint layer (NOT an Agent) — Architecture §3 / §G2.
+
+Loads SKU readiness from the filesystem Knowledge directory (default:
+``knowledge/`` at repo root). Falls back to an in-code demo map only if
+the directory is missing or empty.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Optional
 
 from .schema import (
     ExemptionTicket,
@@ -16,9 +26,29 @@ from .schema import (
 )
 
 
-# Demo SKU knowledge registry: sku_id → ready? missing_items
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def knowledge_root() -> Path:
+    """Resolve Knowledge directory (EVAW_KNOWLEDGE_ROOT or ``<repo>/knowledge``)."""
+    override = (os.environ.get("EVAW_KNOWLEDGE_ROOT") or "").strip()
+    if override:
+        return Path(override).expanduser().resolve()
+    return (_repo_root() / "knowledge").resolve()
+
+
+# ---------------------------------------------------------------------------
+# In-code fallback (used only when filesystem catalog unavailable)
+# ---------------------------------------------------------------------------
+
+
 DEMO_SKU_KNOWLEDGE: dict[str, dict] = {
-    # Happy path — full knowledge
     "SKU-BED-001": {
         "status": KnowledgeStatusEnum.READY,
         "missing_items": [],
@@ -26,7 +56,6 @@ DEMO_SKU_KNOWLEDGE: dict[str, dict] = {
         "has_structure": True,
         "has_platform_spec": True,
     },
-    # Knowledge block demo
     "SKU-BED-MISSING": {
         "status": KnowledgeStatusEnum.MISSING,
         "missing_items": [
@@ -38,7 +67,6 @@ DEMO_SKU_KNOWLEDGE: dict[str, dict] = {
         "has_structure": False,
         "has_platform_spec": False,
     },
-    # High-risk HITL demo (structure sensitive, knowledge ready)
     "SKU-BED-STRUCT": {
         "status": KnowledgeStatusEnum.READY,
         "missing_items": [],
@@ -49,6 +77,285 @@ DEMO_SKU_KNOWLEDGE: dict[str, dict] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Normalization / lookup helpers
+# ---------------------------------------------------------------------------
+
+
+def normalize_sku_key(sku_id: str) -> str:
+    """Case-insensitive key: upper + hyphen/underscore collapsed to hyphen."""
+    s = (sku_id or "").strip()
+    s = re.sub(r"[\s_]+", "-", s)
+    return s.upper()
+
+
+@dataclass
+class SkuCatalogEntry:
+    sku_id: str
+    status: KnowledgeStatusEnum
+    missing_items: list[str] = field(default_factory=list)
+    has_vis: bool = False
+    has_structure: bool = False
+    has_platform_spec: bool = False
+    brand_id: Optional[str] = None
+    aliases: list[str] = field(default_factory=list)
+    source_path: Optional[str] = None
+    via_prefix: bool = False
+
+    def as_bind_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "missing_items": list(self.missing_items),
+            "has_vis": self.has_vis,
+            "has_structure": self.has_structure,
+            "has_platform_spec": self.has_platform_spec,
+            "brand_id": self.brand_id,
+            "source_path": self.source_path,
+            "via_prefix": self.via_prefix,
+        }
+
+
+def _read_json(path: Path) -> Optional[dict[str, Any]]:
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _status_from_str(raw: Any) -> KnowledgeStatusEnum:
+    try:
+        return KnowledgeStatusEnum(str(raw or "missing").strip().lower())
+    except ValueError:
+        return KnowledgeStatusEnum.MISSING
+
+
+def _validate_refs(root: Path, manifest: dict[str, Any]) -> list[str]:
+    """Return missing_items for broken/absent refs when claiming ready."""
+    missing: list[str] = []
+    has_vis = bool(manifest.get("has_vis"))
+    has_structure = bool(manifest.get("has_structure"))
+    has_platform = bool(manifest.get("has_platform_spec"))
+
+    vis_ref = manifest.get("vis_ref")
+    if has_vis:
+        if not vis_ref or not (root / str(vis_ref)).is_file():
+            missing.append("vis_brand_tokens")
+    else:
+        missing.append("vis_brand_tokens")
+
+    structure_ref = manifest.get("structure_ref")
+    if has_structure:
+        if not structure_ref or not (root / str(structure_ref)).is_file():
+            missing.append("product_structure_refs")
+    else:
+        missing.append("product_structure_refs")
+
+    platform_refs = manifest.get("platform_refs") or []
+    if has_platform:
+        if not platform_refs:
+            missing.append("platform_safe_zone")
+        else:
+            bad = [p for p in platform_refs if not (root / str(p)).is_file()]
+            if bad:
+                missing.append("platform_safe_zone")
+    else:
+        missing.append("platform_safe_zone")
+
+    # Dedupe preserve order
+    seen: set[str] = set()
+    out: list[str] = []
+    for m in missing:
+        if m not in seen:
+            seen.add(m)
+            out.append(m)
+    return out
+
+
+def _entry_from_manifest(
+    root: Path, sku_dir: Path, manifest: dict[str, Any]
+) -> SkuCatalogEntry:
+    sku_id = str(manifest.get("sku_id") or sku_dir.name).strip()
+    status = _status_from_str(manifest.get("status"))
+    declared_missing = [str(x) for x in (manifest.get("missing_items") or [])]
+
+    has_vis = bool(manifest.get("has_vis"))
+    has_structure = bool(manifest.get("has_structure"))
+    has_platform = bool(manifest.get("has_platform_spec"))
+
+    if status == KnowledgeStatusEnum.READY:
+        ref_missing = _validate_refs(root, manifest)
+        if ref_missing:
+            status = KnowledgeStatusEnum.MISSING
+            # Prefer declared + validation
+            merged = list(declared_missing) + [
+                m for m in ref_missing if m not in declared_missing
+            ]
+            declared_missing = merged or ref_missing
+            has_vis = has_vis and "vis_brand_tokens" not in ref_missing
+            has_structure = (
+                has_structure and "product_structure_refs" not in ref_missing
+            )
+            has_platform = has_platform and "platform_safe_zone" not in ref_missing
+    elif status == KnowledgeStatusEnum.MISSING and not declared_missing:
+        declared_missing = [
+            "product_structure_refs",
+            "vis_brand_tokens",
+            "platform_safe_zone",
+        ]
+
+    aliases = [str(a).strip() for a in (manifest.get("aliases") or []) if str(a).strip()]
+
+    return SkuCatalogEntry(
+        sku_id=sku_id,
+        status=status,
+        missing_items=declared_missing,
+        has_vis=has_vis,
+        has_structure=has_structure,
+        has_platform_spec=has_platform,
+        brand_id=(str(manifest["brand_id"]) if manifest.get("brand_id") else None),
+        aliases=aliases,
+        source_path=str(sku_dir.relative_to(root)) if sku_dir.is_relative_to(root) else str(sku_dir),
+        via_prefix=False,
+    )
+
+
+def _scan_sku_dirs(root: Path) -> dict[str, SkuCatalogEntry]:
+    """Map normalized sku keys → entry (primary id + aliases)."""
+    index: dict[str, SkuCatalogEntry] = {}
+    skus_dir = root / "skus"
+    if not skus_dir.is_dir():
+        return index
+
+    for child in sorted(skus_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("_"):
+            continue
+        manifest = _read_json(child / "manifest.json")
+        if not manifest:
+            continue
+        entry = _entry_from_manifest(root, child, manifest)
+        keys = {normalize_sku_key(entry.sku_id), normalize_sku_key(child.name)}
+        for alias in entry.aliases:
+            keys.add(normalize_sku_key(alias))
+        for key in keys:
+            # First wins; do not overwrite MISSING demo with prefix later
+            if key not in index:
+                index[key] = entry
+    return index
+
+
+def _apply_prefix_defaults(
+    root: Path,
+    sku_id: str,
+    index: dict[str, SkuCatalogEntry],
+) -> Optional[SkuCatalogEntry]:
+    catalog = _read_json(root / "catalog.json") or {}
+    rules = catalog.get("prefix_defaults") or []
+    norm = normalize_sku_key(sku_id)
+
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        prefix = str(rule.get("prefix") or "")
+        if not prefix:
+            continue
+        case_insensitive = bool(rule.get("match_case_insensitive", True))
+        if case_insensitive:
+            if not norm.startswith(normalize_sku_key(prefix)):
+                continue
+        elif not sku_id.startswith(prefix):
+            continue
+
+        except_ids = {
+            normalize_sku_key(str(x)) for x in (rule.get("except_sku_ids") or [])
+        }
+        if norm in except_ids:
+            return None
+
+        clone_from = str(rule.get("clone_from") or "").strip()
+        if not clone_from:
+            continue
+        template = index.get(normalize_sku_key(clone_from))
+        if template is None:
+            continue
+        return SkuCatalogEntry(
+            sku_id=sku_id,
+            status=template.status,
+            missing_items=list(template.missing_items),
+            has_vis=template.has_vis,
+            has_structure=template.has_structure,
+            has_platform_spec=template.has_platform_spec,
+            brand_id=template.brand_id,
+            aliases=[],
+            source_path=template.source_path,
+            via_prefix=True,
+        )
+    return None
+
+
+def _fallback_index() -> dict[str, SkuCatalogEntry]:
+    index: dict[str, SkuCatalogEntry] = {}
+    for sku_id, meta in DEMO_SKU_KNOWLEDGE.items():
+        entry = SkuCatalogEntry(
+            sku_id=sku_id,
+            status=meta["status"],
+            missing_items=list(meta["missing_items"]),
+            has_vis=bool(meta["has_vis"]),
+            has_structure=bool(meta["has_structure"]),
+            has_platform_spec=bool(meta["has_platform_spec"]),
+            source_path="DEMO_SKU_KNOWLEDGE",
+        )
+        index[normalize_sku_key(sku_id)] = entry
+    return index
+
+
+@lru_cache(maxsize=4)
+def load_sku_catalog(root_str: Optional[str] = None) -> dict[str, SkuCatalogEntry]:
+    """Load and cache SKU catalog keyed by normalize_sku_key."""
+    root = Path(root_str) if root_str else knowledge_root()
+    index = _scan_sku_dirs(root)
+    if not index:
+        return _fallback_index()
+    return index
+
+
+def clear_catalog_cache() -> None:
+    load_sku_catalog.cache_clear()
+
+
+def lookup_sku_catalog(sku_id: str) -> Optional[dict[str, Any]]:
+    """Public helper: resolve sku → bind dict, or None if unknown."""
+    root = knowledge_root()
+    index = load_sku_catalog(str(root) if root.is_dir() else None)
+    key = normalize_sku_key(sku_id)
+    entry = index.get(key)
+    if entry is None and root.is_dir():
+        entry = _apply_prefix_defaults(root, sku_id, index)
+    if entry is None:
+        return None
+    return entry.as_bind_dict()
+
+
+def list_catalog_skus() -> list[str]:
+    root = knowledge_root()
+    index = load_sku_catalog(str(root) if root.is_dir() else None)
+    # Unique by primary sku_id
+    seen: set[str] = set()
+    out: list[str] = []
+    for entry in index.values():
+        if entry.sku_id not in seen:
+            seen.add(entry.sku_id)
+            out.append(entry.sku_id)
+    return sorted(out)
+
+
+# ---------------------------------------------------------------------------
+# Bind / gate / exemption (unchanged contracts)
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class KnowledgeBindResult:
     knowledge: KnowledgeStatus
@@ -56,9 +363,13 @@ class KnowledgeBindResult:
     block_message: Optional[str] = None
 
 
+def _resolve_catalog_row(sku_id: str) -> Optional[dict[str, Any]]:
+    return lookup_sku_catalog(sku_id)
+
+
 def bind_knowledge(task: VisualTask) -> KnowledgeBindResult:
     """Resolve KnowledgeStatus for task. Does not mutate status machine."""
-    catalog = DEMO_SKU_KNOWLEDGE.get(task.sku_id)
+    catalog = _resolve_catalog_row(task.sku_id)
     if catalog is None:
         ks = KnowledgeStatus(
             task_id=task.task_id,

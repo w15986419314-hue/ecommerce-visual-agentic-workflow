@@ -1,0 +1,17 @@
+{
+  "brand_id": "YSRJ",
+  "display_name": "演示品牌 YSRJ（表单试填）",
+  "palette": {
+    "primary": "#1A1A1A",
+    "secondary": "#C4A484",
+    "neutral": "#F7F5F2",
+    "accent": "#5B7C99"
+  },
+  "typography": {
+    "headline": "PingFang SC / Noto Sans SC Medium",
+    "body": "PingFang SC / Noto Sans SC Regular"
+  },
+  "tone": ["酒店加床", "轻便", "稳固"],
+  "logo_rules": ["主图可选角标", "避免遮挡产品结构"],
+  "forbidden": ["医疗级功效宣称", "无依据承重对比"]
+}

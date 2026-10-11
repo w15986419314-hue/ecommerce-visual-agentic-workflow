@@ -1,0 +1,13 @@
+{
+  "platform": "amazon",
+  "safe_zone": {
+    "top_pct": 5,
+    "bottom_pct": 5,
+    "left_pct": 5,
+    "right_pct": 5,
+    "notes": "主图白底优先；少文字；符合 Amazon image guidelines"
+  },
+  "hero_canvas": {"recommended": "2000x2000", "min": "1000x1000"},
+  "text_rules": ["主图尽量无文字叠加", "背景纯白或浅灰"],
+  "badge_slots": []
+}

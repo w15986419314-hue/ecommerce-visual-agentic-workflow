@@ -1,0 +1,13 @@
+{
+  "platform": "jd",
+  "safe_zone": {
+    "top_pct": 10,
+    "bottom_pct": 14,
+    "left_pct": 6,
+    "right_pct": 6,
+    "notes": "京东主图注意顶部活动条与底部到手价区；手机端优先"
+  },
+  "hero_canvas": {"recommended": "800x800", "min": "750x750"},
+  "text_rules": ["卖点短句优先", "避免与京东官方角标冲突"],
+  "badge_slots": ["top_banner", "bottom_price"]
+}

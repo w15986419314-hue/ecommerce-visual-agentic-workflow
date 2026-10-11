@@ -1,0 +1,21 @@
+{
+  "sku_id": "sku-bed-01",
+  "brand_id": "YSRJ",
+  "status": "ready",
+  "aliases": ["SKU-BED-01", "sku_bed_01", "SKU-bed-01"],
+  "title": "表单试填折叠床（酒店加床）",
+  "category": "folding_bed",
+  "has_vis": true,
+  "has_structure": true,
+  "has_platform_spec": true,
+  "missing_items": [],
+  "vis_ref": "brands/YSRJ/vis.json",
+  "structure_ref": "skus/sku-bed-01/structure.json",
+  "platform_refs": [
+    "platforms/tmall.json",
+    "platforms/jd.json",
+    "platforms/amazon.json",
+    "platforms/dtc.json"
+  ],
+  "notes": "Demo/real trial knowledge bundle — enough for Live Gen without exemption"
+}

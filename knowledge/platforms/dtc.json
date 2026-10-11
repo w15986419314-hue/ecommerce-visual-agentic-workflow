@@ -1,0 +1,13 @@
+{
+  "platform": "dtc",
+  "safe_zone": {
+    "top_pct": 6,
+    "bottom_pct": 8,
+    "left_pct": 4,
+    "right_pct": 4,
+    "notes": "站内灵活；仍建议留 CTA 与导航安全区"
+  },
+  "hero_canvas": {"recommended": "1200x1200", "min": "800x800"},
+  "text_rules": ["可品牌化文案", "保持 VIS 色板一致"],
+  "badge_slots": ["optional_cta"]
+}

@@ -1,0 +1,21 @@
+{
+  "sku_id": "SKU-BED-NEW",
+  "brand_id": "brand_xiu",
+  "status": "ready",
+  "aliases": ["sku-bed-new"],
+  "title": "新品演示款",
+  "category": "folding_bed",
+  "has_vis": true,
+  "has_structure": true,
+  "has_platform_spec": true,
+  "missing_items": [],
+  "vis_ref": "brands/brand_xiu/vis.json",
+  "structure_ref": "skus/SKU-BED-NEW/structure.json",
+  "platform_refs": [
+    "platforms/tmall.json",
+    "platforms/jd.json",
+    "platforms/amazon.json",
+    "platforms/dtc.json"
+  ],
+  "notes": "Demo/real trial knowledge bundle — enough for Live Gen without exemption"
+}

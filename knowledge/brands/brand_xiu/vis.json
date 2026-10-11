@@ -1,0 +1,17 @@
+{
+  "brand_id": "brand_xiu",
+  "display_name": "袖羽（演示）",
+  "palette": {
+    "primary": "#2C3E50",
+    "secondary": "#D4A574",
+    "neutral": "#F5F1EB",
+    "accent": "#8B4513"
+  },
+  "typography": {
+    "headline": "思源黑体 / Noto Sans SC Bold",
+    "body": "思源黑体 / Noto Sans SC Regular"
+  },
+  "tone": ["温润", "稳固", "客房可用"],
+  "logo_rules": ["主图可不强制露出 logo", "详情页首次出现品牌名"],
+  "forbidden": ["荧光色大面积", "夸大承重数值无依据"]
+}

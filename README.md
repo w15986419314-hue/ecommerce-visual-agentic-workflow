@@ -66,6 +66,7 @@ python3 -m evaw.cli evalset-v0
 
 飞书提需（表单字段 → VisualTask → 通知）见 [`docs/飞书提需说明.md`](docs/%E9%A3%9E%E4%B9%A6%E6%8F%90%E9%9C%80%E8%AF%B4%E6%98%8E.md)。  
 飞书人审（待办含五维 QA / reason_code / 候选图）见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
+SKU 知识包（真实 SKU / VIS / 结构图 / 平台规范）见 [`knowledge/README.md`](knowledge/README.md)。
 
 ---
 
@@ -98,14 +99,21 @@ python3 -m evaw.cli evalset-v0
 ```text
 ecommerce-visual-agentic-workflow/
 ├── README.md
+├── knowledge/               # SKU 知识包（VIS / 结构 / 平台规范）※ 非 Agent
+│   ├── README.md            # 如何新增 SKU、补 VIS/结构图/平台规范
+│   ├── catalog.json         # 索引 + SKU-BED-* 演示前缀规则
+│   ├── platforms/           # tmall · jd · amazon · dtc
+│   ├── brands/<id>/vis.json
+│   └── skus/<sku_id>/       # manifest.json + structure.json
 ├── evalset/                 # QA 评估集
 │   ├── README.md
 │   └── v0/cases.json
+├── docs/                    # 飞书提需 / 人审说明
 ├── artifacts/               # 本地产物（gitignore）
 └── evaw/
     ├── schema.py            # 锁定枚举 + VisualQAReport
     ├── state_machine.py
-    ├── knowledge.py         # Constraint，非 Agent
+    ├── knowledge.py         # Constraint：扫描 knowledge/ 目录
     ├── hitl.py
     ├── workflow.py
     ├── cli.py

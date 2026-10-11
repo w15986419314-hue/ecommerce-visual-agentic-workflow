@@ -1,0 +1,13 @@
+{
+  "platform": "tmall",
+  "safe_zone": {
+    "top_pct": 8,
+    "bottom_pct": 12,
+    "left_pct": 5,
+    "right_pct": 5,
+    "notes": "留出促销角标与下方价格条；主卖点避开四角"
+  },
+  "hero_canvas": {"recommended": "800x800", "min": "750x750"},
+  "text_rules": ["主文案≤12字", "禁止虚假绝对化用语"],
+  "badge_slots": ["top_left_promo", "bottom_price_bar"]
+}
