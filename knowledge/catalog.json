@@ -11,14 +11,19 @@
     {
       "prefix": "SKU-BED-",
       "match_case_insensitive": true,
-      "except_sku_ids": ["SKU-BED-MISSING"],
+      "except_sku_ids": [
+        "SKU-BED-MISSING"
+      ],
       "clone_from": "SKU-BED-001",
       "notes": "Demo convenience: unknown SKU-BED-* (except MISSING) inherit ready bundle from SKU-BED-001 so form sync does not need exemption. Production should add an explicit sku folder."
     },
     {
       "prefix": "sku-bed-",
       "match_case_insensitive": true,
-      "except_sku_ids": ["sku-bed-missing", "SKU-BED-MISSING"],
+      "except_sku_ids": [
+        "sku-bed-missing",
+        "SKU-BED-MISSING"
+      ],
       "clone_from": "sku-bed-01",
       "notes": "Lowercase form variants (e.g. sku-bed-02) inherit sku-bed-01 ready pack in demo."
     }
@@ -31,5 +36,17 @@
     "SKU-BED-DEMO",
     "SKU-BED-NEW",
     "SKU-BED-BITABLE-001"
-  ]
+  ],
+  "explicit_skus": {
+    "folding-bed-01": {
+      "status": "ready",
+      "path": "skus/folding-bed-01"
+    }
+  },
+  "skus": {
+    "folding-bed-01": {
+      "status": "ready",
+      "path": "skus/folding-bed-01"
+    }
+  }
 }
