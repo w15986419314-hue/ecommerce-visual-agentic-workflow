@@ -213,6 +213,7 @@
       "aliases": [
         "is_new_product",
         "是否新品",
+        "收否新品",
         "新品",
         "new_product"
       ],
@@ -259,6 +260,7 @@
     }
   ],
   "webhook_paths": {
+    "bitable_sync": "feishu-bitable-sync [--poll]  (Open API poll → VisualTask)",
     "http_stub": "POST /feishu/intake  (CLI: feishu-intake-webhook)",
     "file_ingest": "feishu-intake-from-json --file <payload.json>",
     "bitable_event": "record.created → map fields → create VisualTask"

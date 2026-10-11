@@ -186,7 +186,7 @@ INTAKE_FIELDS: tuple[FieldDef, ...] = (
     FieldDef(
         key="is_new_product",
         label_zh="是否新品",
-        feishu_aliases=("is_new_product", "是否新品", "新品", "new_product"),
+        feishu_aliases=("is_new_product", "是否新品", "收否新品", "新品", "new_product"),
         field_type="checkbox",
         required=False,
         bitable_type=7,
@@ -240,6 +240,7 @@ def field_map_as_dict() -> dict[str, Any]:
             for f in INTAKE_FIELDS
         ],
         "webhook_paths": {
+            "bitable_sync": "feishu-bitable-sync [--poll]  (Open API poll → VisualTask)",
             "http_stub": "POST /feishu/intake  (CLI: feishu-intake-webhook)",
             "file_ingest": "feishu-intake-from-json --file <payload.json>",
             "bitable_event": "record.created → map fields → create VisualTask",
@@ -396,12 +397,14 @@ _ASSET_TYPE_NORMALIZE: dict[str, str] = {
     "主图(单张)": "hero",
     "单张主图": "hero",
     "hero_pack": "hero_pack",
+    "hero-pack": "hero_pack",
     "主图包": "hero_pack",
     "sku": "sku",
     "sku图": "sku",
     "单规格sku": "sku",
     "单规格sku图": "sku",
     "sku_multi": "sku_multi",
+    "sku-multi": "sku_multi",
     "多规格sku": "sku_multi",
     "多规格": "sku_multi",
     "pdp_module": "pdp_module",
@@ -409,6 +412,7 @@ _ASSET_TYPE_NORMALIZE: dict[str, str] = {
     "详情(单张)": "pdp_module",
     "单张详情": "pdp_module",
     "pdp_set": "pdp_set",
+    "pdp-set": "pdp_set",
     "多张详情": "pdp_set",
     "详情套装": "pdp_set",
 }
@@ -422,7 +426,12 @@ def normalize_asset_type(raw: Any) -> str:
     key = _ASSET_TYPE_NORMALIZE.get(s.lower()) or _ASSET_TYPE_NORMALIZE.get(s)
     if key:
         return key
-    return s.lower().replace(" ", "_")
+    # hero-pack / sku-multi → underscore keys
+    collapsed = s.lower().replace(" ", "_").replace("-", "_")
+    key2 = _ASSET_TYPE_NORMALIZE.get(collapsed)
+    if key2:
+        return key2
+    return collapsed
 
 
 def _as_int(v: Any) -> int | None:
@@ -439,6 +448,33 @@ def _as_int(v: Any) -> int | None:
         return int(float(s))
     except ValueError:
         return None
+
+
+
+_PLATFORM_NORMALIZE: dict[str, str] = {
+    "tmall": "tmall",
+    "天猫": "tmall",
+    "淘宝": "tmall",
+    "taobao": "tmall",
+    "jd": "jd",
+    "京东": "jd",
+    "jingdong": "jd",
+    "amazon": "amazon",
+    "亚马逊": "amazon",
+    "dtc": "dtc",
+    "独立站": "dtc",
+}
+
+
+def normalize_platform(raw: Any) -> str:
+    """Map form EN/ZH platform labels → canonical platform key."""
+    s = str(raw or "tmall").strip()
+    if not s:
+        return "tmall"
+    key = _PLATFORM_NORMALIZE.get(s.lower()) or _PLATFORM_NORMALIZE.get(s)
+    if key:
+        return key
+    return s.lower().replace(" ", "_")
 
 
 def payload_to_brief(
@@ -464,7 +500,7 @@ def payload_to_brief(
             f"keys={sorted(flat.keys())[:40]}"
         )
 
-    platform = str(get("platform", default="tmall") or "tmall").strip().lower()
+    platform = normalize_platform(get("platform", default="tmall") or "tmall")
     asset_type = normalize_asset_type(get("asset_type", default="hero") or "hero")
     points = _as_list(get("selling_points"))
     if not points:

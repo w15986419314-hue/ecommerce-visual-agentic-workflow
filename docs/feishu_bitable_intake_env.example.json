@@ -1,0 +1,7 @@
+{
+  "FEISHU_BITABLE_APP_TOKEN": "B8kubs46saK9ZnsII2IcLNbXntg",
+  "FEISHU_BITABLE_TABLE_ID": "tblessb0FYqQUYg4",
+  "FEISHU_BITABLE_URL": "https://scnjh6x3pkck.feishu.cn/base/B8kubs46saK9ZnsII2IcLNbXntg",
+  "FEISHU_INTAKE_FORM_URL": "https://scnjh6x3pkck.feishu.cn/share/base/form/shrcn3nkmUrA2XYufTexOC3uO5b",
+  "note": "运营填表: FEISHU_INTAKE_FORM_URL。工程同步: python3 -m evaw.cli feishu-bitable-sync (或 --poll --interval 60；--live-notify 发群)。Webhook 备选: feishu-intake-webhook。"
+}

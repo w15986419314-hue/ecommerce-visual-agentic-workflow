@@ -62,7 +62,7 @@ python3 -m evaw.cli qa-live-demo
 python3 -m evaw.cli evalset-v0
 ```
 
-更多：`live-happy` · `live-knowledge-block` · `feishu-intake` / `feishu-intake-from-json` / `feishu-intake-webhook` / `feishu-bitable-setup`（真飞书提需：表单字段映射 + webhook stub）· `feishu-demo` · `hitl-chat-demo` / `hitl-apply`（飞书聊天人审，不代审）· `--live` / `--qa-live`。
+更多：`live-happy` · `live-knowledge-block` · `feishu-intake` / `feishu-intake-from-json` / `feishu-intake-webhook` / `feishu-bitable-setup` / `feishu-bitable-sync`（真飞书提需：表单→多维表轮询/webhook 建任务）· `feishu-demo` · `hitl-chat-demo` / `hitl-apply`（飞书聊天人审，不代审）· `--live` / `--qa-live`。
 
 飞书提需（表单字段 → VisualTask → 通知）见 [`docs/飞书提需说明.md`](docs/%E9%A3%9E%E4%B9%A6%E6%8F%90%E9%9C%80%E8%AF%B4%E6%98%8E.md)。  
 飞书人审（待办含五维 QA / reason_code / 候选图）见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
@@ -73,7 +73,7 @@ python3 -m evaw.cli evalset-v0
 
 | 能力 | 现状 |
 |------|------|
-| **飞书 D3** | 已接 Open API（`FEISHU_APP_ID` + `SECRET`）；无凭证时走 mock。提需支持多维表单字段映射 + webhook stub / from-json；状态通知、审批跳转可用。运营填：**多维表格表单链接**（见 docs）。 |
+| **飞书 D3** | 已接 Open API（`FEISHU_APP_ID` + `SECRET`）；无凭证时走 mock。提需支持多维表单字段映射 + **`feishu-bitable-sync` 轮询** / webhook stub / from-json；状态通知、审批跳转可用。运营填：**多维表格表单链接**（见 docs）。 |
 | **Live Gen** | 有 `OPENAI_API_KEY` 时尝试 OpenAI Images；**当前运行环境被官方以地区限制拒绝（403 `unsupported_country_region`）**，因此作品集演示默认用 **`simulated_live`** 写本地占位 PNG + `candidates.json`，语义与闸门与真出图一致。 |
 | **Live QA** | 默认 **规则引擎**（五维可复现）；多模态 Vision 需 key + `EVAW_QA_MULTIMODAL=1`，失败回落规则。 |
 | **Secrets** | `.env.local` 已 gitignore，**勿提交**密钥。 |
@@ -112,7 +112,7 @@ ecommerce-visual-agentic-workflow/
     ├── evalset_v0.py
     ├── providers/           # stub · simulated_live · openai_images
     ├── qa/                  # stub · rules · multimodal
-    ├── feishu/              # mock · api · field_map · webhook · bitable_setup
+    ├── feishu/              # mock · api · field_map · webhook · bitable_setup · bitable_sync
     └── agents/              # brief_strategy · generation · visual_qa
 ```
 

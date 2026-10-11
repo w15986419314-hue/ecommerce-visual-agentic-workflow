@@ -615,9 +615,122 @@ def run_feishu_bitable_setup(*, name: str = "EVAW 提需") -> int:
     return 0 if report.get("ok") else 1
 
 
+def run_feishu_bitable_sync(
+    *,
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = True,
+    notify: bool = False,
+    limit: int | None = None,
+    dry_run: bool = False,
+    poll: bool = False,
+    interval: float = 60.0,
+    app_token: str | None = None,
+    table_id: str | None = None,
+    include_synced: bool = False,
+) -> int:
+    """Pull new Feishu bitable records → create VisualTask (deduped by record_id)."""
+    import json
+    from .feishu.bitable_sync import poll_loop, sync_once
+
+    _load_env_local()
+    if poll:
+        poll_loop(
+            interval_sec=interval,
+            artifacts_dir=artifacts_dir,
+            force_mock=force_mock,
+            notify=notify,
+            app_token=app_token,
+            table_id=table_id,
+        )
+        return 0
+    report = sync_once(
+        artifacts_dir=artifacts_dir,
+        force_mock=force_mock,
+        notify=notify,
+        limit=limit,
+        dry_run=dry_run,
+        app_token=app_token,
+        table_id=table_id,
+        include_synced=include_synced,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("ok") else 1
+
+
+
 def main(argv: list[str] | None = None) -> int:
     _load_env_local()
     argv_list = list(argv) if argv is not None else sys.argv[1:]
+
+
+
+    # Dedicated: feishu-bitable-sync — poll/sync bitable records → VisualTask
+    if argv_list and argv_list[0] == "feishu-bitable-sync":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-bitable-sync",
+            description=(
+                "Sync Feishu 多维表格 new records → EVAW VisualTask. "
+                "Uses FEISHU_APP_ID/SECRET + FEISHU_BITABLE_APP_TOKEN/TABLE_ID "
+                "(defaults to live EVAW 提需 base). Dedupes by record_id. "
+                "Default mock (no IM); --live-notify for group chat."
+            ),
+        )
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--app-token",
+            default=None,
+            help="Bitable app_token (default: env or live EVAW base)",
+        )
+        p.add_argument(
+            "--table-id",
+            default=None,
+            help="Bitable table_id (default: env or live EVAW table)",
+        )
+        p.add_argument(
+            "--limit",
+            type=int,
+            default=None,
+            help="Only process the last N unsynced filled records",
+        )
+        p.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Parse briefs only; do not create tasks or update state",
+        )
+        p.add_argument(
+            "--include-synced",
+            action="store_true",
+            help="Re-process records already in sync state (creates new tasks)",
+        )
+        p.add_argument(
+            "--poll",
+            action="store_true",
+            help="Keep polling (blocking loop)",
+        )
+        p.add_argument(
+            "--interval",
+            type=float,
+            default=60.0,
+            help="Poll interval seconds (default 60)",
+        )
+        p.add_argument(
+            "--live-notify",
+            action="store_true",
+            help="Allow live Feishu IM on intake (default: mock only)",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_feishu_bitable_sync(
+            artifacts_dir=a.artifacts_dir,
+            force_mock=not a.live_notify,
+            notify=a.live_notify,
+            limit=a.limit,
+            dry_run=a.dry_run,
+            poll=a.poll,
+            interval=a.interval,
+            app_token=a.app_token,
+            table_id=a.table_id,
+            include_synced=a.include_synced,
+        )
 
 
     # Dedicated: feishu-intake-from-json — webhook/bitable payload → task
