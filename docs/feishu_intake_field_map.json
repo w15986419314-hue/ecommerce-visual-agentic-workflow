@@ -1,6 +1,6 @@
 {
-  "version": "1.0",
-  "purpose": "EVAW 飞书提需字段契约（问卷 / 多维表格表单视图 / 机器人引导）",
+  "version": "1.1",
+  "purpose": "EVAW 飞书提需字段契约 v1.1（支持主图包 / 多规格SKU / 多张详情）",
   "operator_fill_where": {
     "preferred": "飞书多维表格「表单视图」分享链接（运营打开链接填表提交）",
     "alt_bot": "飞书群内 @机器人 按字段问答 / 交互卡片",
@@ -25,19 +25,21 @@
     },
     {
       "key": "sku_id",
-      "label_zh": "SKU",
+      "label_zh": "主SKU",
       "aliases": [
         "sku_id",
         "SKU",
         "sku",
-        "商品编码"
+        "商品编码",
+        "主SKU",
+        "主商品编码"
       ],
       "required": true,
       "field_type": "text",
       "options": [],
       "bitable_type": 1,
       "example": "SKU-BED-001",
-      "notes": ""
+      "notes": "多规格时填主款编码；具体规格写在「规格列表」"
     },
     {
       "key": "platform",
@@ -66,18 +68,96 @@
         "asset_type",
         "图型",
         "asset",
-        "AssetType"
+        "AssetType",
+        "主图",
+        "主图包",
+        "SKU图",
+        "多规格SKU",
+        "详情模块",
+        "多张详情"
       ],
       "required": true,
       "field_type": "single_select",
       "options": [
         "hero",
+        "hero_pack",
         "sku",
-        "pdp_module"
+        "sku_multi",
+        "pdp_module",
+        "pdp_set"
       ],
       "bitable_type": 3,
-      "example": "hero",
-      "notes": "hero=主图 · sku · pdp_module=详情模块"
+      "example": "hero_pack",
+      "notes": "hero=单张主图 · hero_pack=主图包 · sku=单规格SKU图 · sku_multi=多规格SKU · pdp_module=单张详情 · pdp_set=多张详情；表单选项可改成中文显示名，入库仍映射到上述英文 key"
+    },
+    {
+      "key": "image_count",
+      "label_zh": "出图张数",
+      "aliases": [
+        "image_count",
+        "出图张数",
+        "张数",
+        "pack_size",
+        "图片数量"
+      ],
+      "required": false,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "5",
+      "notes": "主图包/多规格SKU/多张详情时必填；主图包常见 5；多规格≈规格条数；多张详情≈模块数"
+    },
+    {
+      "key": "sku_variants",
+      "label_zh": "规格列表",
+      "aliases": [
+        "sku_variants",
+        "规格列表",
+        "多规格",
+        "规格",
+        "variants",
+        "SKU列表"
+      ],
+      "required": false,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "米白,烟灰,藏青",
+      "notes": "图型=sku_multi 时填写；逗号/分号/换行分隔色号或子SKU编码"
+    },
+    {
+      "key": "pack_slots",
+      "label_zh": "主图包槽位",
+      "aliases": [
+        "pack_slots",
+        "主图包槽位",
+        "槽位说明",
+        "主图位",
+        "hero_slots"
+      ],
+      "required": false,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "1白底主图;2卖点承重;3卖点折叠;4场景客房;5尺码表",
+      "notes": "图型=hero_pack 时填写；按主图位顺序写清每张要表达什么"
+    },
+    {
+      "key": "pdp_modules",
+      "label_zh": "详情模块清单",
+      "aliases": [
+        "pdp_modules",
+        "详情模块清单",
+        "详情模块",
+        "模块清单",
+        "detail_modules"
+      ],
+      "required": false,
+      "field_type": "text",
+      "options": [],
+      "bitable_type": 1,
+      "example": "材质细节,承重测试,折叠演示,场景氛围,规格参数",
+      "notes": "图型=pdp_set 时填写；按详情长图从上到下的模块顺序"
     },
     {
       "key": "selling_points",
@@ -109,7 +189,7 @@
       "options": [],
       "bitable_type": 1,
       "example": "800x800",
-      "notes": ""
+      "notes": "单张画布尺寸；主图包/多规格每张同尺寸；详情模块按平台常见宽度（如 790）"
     },
     {
       "key": "deadline",

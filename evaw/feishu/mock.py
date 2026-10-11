@@ -35,7 +35,20 @@ def _parse_platform(s: str) -> Platform:
 
 
 def _parse_asset(s: str) -> AssetType:
+    """Map intake asset_type (incl. pack modes) → pipeline AssetType."""
     key = (s or "hero").strip().lower()
+    pack_to_base = {
+        "hero_pack": "hero",
+        "sku_multi": "sku",
+        "pdp_set": "pdp_module",
+        "主图包": "hero",
+        "多规格sku": "sku",
+        "多张详情": "pdp_module",
+        "主图": "hero",
+        "sku图": "sku",
+        "详情模块": "pdp_module",
+    }
+    key = pack_to_base.get(key, key)
     for a in AssetType:
         if a.value == key:
             return a
@@ -98,6 +111,10 @@ class MockFeishuAdapter(FeishuAdapter):
                 "is_new_product": brief.is_new_product,
                 "risk_flags": brief.risk_flags,
                 "requester_id": brief.requester_id,
+                "image_count": brief.image_count,
+                "sku_variants": brief.sku_variants,
+                "pack_slots": brief.pack_slots,
+                "pdp_modules": brief.pdp_modules,
                 "source_message_id": brief.source_message_id,
                 "chat_id": brief.chat_id,
             },

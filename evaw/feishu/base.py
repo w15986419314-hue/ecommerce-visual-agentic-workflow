@@ -32,6 +32,11 @@ class FeishuBriefPayload:
     is_new_product: bool = False
     risk_flags: list[str] = field(default_factory=list)
     requester_id: str = "ops_feishu"
+    # Pack / multi-deliverable (v1.1) — optional; kept on brief for intake + raw
+    image_count: Optional[int] = None
+    sku_variants: list[str] = field(default_factory=list)
+    pack_slots: list[str] = field(default_factory=list)
+    pdp_modules: list[str] = field(default_factory=list)
     source_message_id: Optional[str] = None
     chat_id: Optional[str] = None
     raw: dict[str, Any] = field(default_factory=dict)
