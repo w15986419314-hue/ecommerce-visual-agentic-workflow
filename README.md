@@ -18,6 +18,7 @@
 | 业务 Case · 短视频 | [`docs/作品集-Case-短视频.md`](docs/作品集-Case-短视频.md) |
 | Figma 七屏 | [figma.com/design/VA5vBY8QfMtfvhUJeZKQPq](https://www.figma.com/design/VA5vBY8QfMtfvhUJeZKQPq) |
 | 简历站 | [cici-visual.netlify.app](https://cici-visual.netlify.app) |
+| 飞书运营看板截图 | [`docs/assets/feishu-ops-kanban.png`](docs/assets/feishu-ops-kanban.png)（列 = 看板状态） |
 
 与口述稿一致：系统闭环与两套业务 Case **分开讲**，数字不混谈。
 
