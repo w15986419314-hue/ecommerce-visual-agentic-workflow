@@ -327,6 +327,10 @@ def run_hitl_chat_demo(
         f"  python3 -m evaw.cli hitl-apply --task {task.task_id} "
         "--decision reject --reason TEXT_ERROR"
     )
+    print(
+        f"  # after reject → rework: "
+        f"python3 -m evaw.cli hitl-rework --task {task.task_id}"
+    )
     if task.status != TaskStatus.PENDING_REVIEW:
         return 1
     return 0
@@ -339,8 +343,9 @@ def run_hitl_apply(
     reason: str = "FIDELITY_STRUCTURE",
     artifacts_dir: str = "artifacts",
     force_mock: bool = False,
+    notes: str | None = None,
 ) -> int:
-    """Apply Lead approve/reject on a PendingReview snapshot; notify Feishu."""
+    """Apply Lead approve/reject (PendingReview) or rework (Rejected); notify Feishu."""
     _load_env_local()
     hitl_dir = str(Path(artifacts_dir) / "hitl_pending")
     mock_root = str(Path(artifacts_dir) / "feishu_mock")
@@ -351,10 +356,19 @@ def run_hitl_apply(
         print(str(e), file=sys.stderr)
         return 2
 
-    if task.status != TaskStatus.PENDING_REVIEW:
+    dec = (decision or "").strip().lower()
+    if dec in ("rework", "revise", "retry"):
+        if task.status != TaskStatus.REJECTED:
+            print(
+                f"Task {task_id} status={task.status.value}; "
+                "rework requires Rejected (reject first)",
+                file=sys.stderr,
+            )
+            return 1
+    elif task.status != TaskStatus.PENDING_REVIEW:
         print(
             f"Task {task_id} status={task.status.value}; "
-            "hitl-apply requires PendingReview",
+            "hitl-apply approve|reject requires PendingReview",
             file=sys.stderr,
         )
         return 1
@@ -366,13 +380,15 @@ def run_hitl_apply(
     engine = _make_engine("stub", artifacts_dir, qa_mode="stub")
     engine.feishu = adapter
     log = RunLog()
+    reason_for_log = reason
+    if dec in ("rework", "revise", "retry") and task.review and task.review.reason_code:
+        reason_for_log = task.review.reason_code.value
     log.add(
         f"=== HITL APPLY decision={decision} task={task_id} "
-        f"reason={reason} ==="
+        f"reason={reason_for_log} ==="
     )
 
     prev = task.status
-    dec = (decision or "").strip().lower()
     if dec in ("approve", "approved", "yes"):
         accept = bool(task.qa and task.qa.overall.value == "PassWithRisk")
         engine.lead_approve(
@@ -434,9 +450,33 @@ def run_hitl_apply(
         ]
         cr = adapter.send_chat_text(chr(10).join(chat_lines))
         log.add(f"[feishu:chat] ok={cr.ok} channel={cr.channel}")
+    elif dec in ("rework", "revise", "retry"):
+        engine.rework_from_reject(task, log, notes=notes)
+        nr = adapter.notify_status(
+            task,
+            previous_status=prev,
+            note=f"打回回流完成 → {task.status.value}",
+        )
+        log.add(
+            f"[feishu:notify] channel={nr.channel} ok={nr.ok} detail={nr.detail}"
+        )
+        chat_lines = [
+            f"[EVAW 打回回流] {task.task_id} → {task.status.value}",
+            f"sku={task.sku_id}（已注入打回反馈并重跑 gen+QA）",
+        ]
+        if task.status == TaskStatus.PENDING_REVIEW:
+            chat_lines.append(
+                f"再次人审：批准 {task.task_id} / 打回 {task.task_id} <原因码>"
+            )
+            chat_lines.append(
+                f"或：python3 -m evaw.cli hitl-apply --task {task.task_id} "
+                "--decision approve|reject"
+            )
+        cr = adapter.send_chat_text(chr(10).join(chat_lines))
+        log.add(f"[feishu:chat] ok={cr.ok} channel={cr.channel}")
     else:
         print(
-            f"Unknown decision={decision!r}; use approve|reject",
+            f"Unknown decision={decision!r}; use approve|reject|rework",
             file=sys.stderr,
         )
         return 2
@@ -470,6 +510,23 @@ def run_hitl_apply(
     print(f"feishu_adapter={adapter.name}")
     print(f"feishu={describe_feishu_adapter(adapter)}")
     return 0
+
+
+def run_hitl_rework(
+    *,
+    task_id: str,
+    artifacts_dir: str = "artifacts",
+    force_mock: bool = False,
+    notes: str | None = None,
+) -> int:
+    """Rejected → reflow gen+QA → usually PendingReview again."""
+    return run_hitl_apply(
+        task_id=task_id,
+        decision="rework",
+        artifacts_dir=artifacts_dir,
+        force_mock=force_mock,
+        notes=notes,
+    )
 
 
 def run_one(
@@ -992,23 +1049,60 @@ def main(argv: list[str] | None = None) -> int:
             force_mock=a.feishu_mock,
         )
 
+    # Dedicated subcommand: hitl-rework --task ... (Rejected → re-pipeline)
+    if argv_list and argv_list[0] == "hitl-rework":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli hitl-rework",
+            description=(
+                "Rework a Rejected task: inject reject feedback, re-run gen+QA, "
+                "return to PendingReview when high-risk rules apply. "
+                "Same as hitl-apply --decision rework."
+            ),
+        )
+        p.add_argument("--task", required=True, help="task_id in Rejected status")
+        p.add_argument(
+            "--notes",
+            default=None,
+            help="Optional extra rework notes (default: prior reject notes)",
+        )
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument(
+            "--feishu-mock",
+            action="store_true",
+            help="Force Feishu mock adapter",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_hitl_rework(
+            task_id=a.task,
+            artifacts_dir=a.artifacts_dir,
+            force_mock=a.feishu_mock,
+            notes=a.notes,
+        )
+
     # Dedicated subcommand: hitl-apply --task ... --decision ...
     if argv_list and argv_list[0] == "hitl-apply":
         p = argparse.ArgumentParser(
             prog="evaw.cli hitl-apply",
-            description="Apply Lead approve/reject on a PendingReview task",
+            description=(
+                "Lead approve/reject on PendingReview, or rework on Rejected"
+            ),
         )
         p.add_argument("--task", required=True, help="task_id from hitl-chat-demo")
         p.add_argument(
             "--decision",
             required=True,
-            choices=["approve", "reject"],
-            help="approve | reject",
+            choices=["approve", "reject", "rework"],
+            help="approve | reject | rework",
         )
         p.add_argument(
             "--reason",
             default="FIDELITY_STRUCTURE",
             help="ReasonCode when rejecting (default: FIDELITY_STRUCTURE)",
+        )
+        p.add_argument(
+            "--notes",
+            default=None,
+            help="Optional notes (rework: override inject text)",
         )
         p.add_argument("--artifacts-dir", default="artifacts")
         p.add_argument(
@@ -1023,6 +1117,7 @@ def main(argv: list[str] | None = None) -> int:
             reason=a.reason,
             artifacts_dir=a.artifacts_dir,
             force_mock=a.feishu_mock,
+            notes=a.notes,
         )
 
     parser = argparse.ArgumentParser(

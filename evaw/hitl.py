@@ -213,6 +213,8 @@ def format_hitl_pending_chat(
             f"· 打回 → 在群里回复：「打回 {tid} TEXT_ERROR」（原因码可换）",
             f"  或执行：python3 -m evaw.cli hitl-apply --task {tid} "
             "--decision reject --reason TEXT_ERROR",
+            f"· 打回后改完再审 → 群里：「改完再审 {tid}」",
+            f"  或执行：python3 -m evaw.cli hitl-rework --task {tid}",
             "",
             "常用原因码：FIDELITY_STRUCTURE / TEXT_ERROR / BRAND_VIOLATION / "
             "LAYOUT_PLATFORM / BUSINESS_JUDGEMENT",

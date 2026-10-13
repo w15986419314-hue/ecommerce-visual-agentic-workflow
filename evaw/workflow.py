@@ -20,6 +20,7 @@ from .schema import (
     KnowledgeStatusEnum,
     OperationsInput,
     QAOverall,
+    REASON_DEFAULT_REFLOW,
     ReasonCode,
     ReviewDecision,
     ReviewDecisionEnum,
@@ -165,8 +166,11 @@ class WorkflowEngine:
         self, task: VisualTask, log: RunLog, *, force_fail: bool = False
     ) -> bool:
         assert_may_generate(task)
-        transition(task, TaskStatus.GENERATING, "start_generation")
-        log.add(f"[transition] → {task.status.value}")
+        if task.status != TaskStatus.GENERATING:
+            transition(task, TaskStatus.GENERATING, "start_generation")
+            log.add(f"[transition] → {task.status.value}")
+        else:
+            log.add("[gen] already Generating (rework continue)")
 
         log.add(f"[gen] {self.gen_agent.provider_summary()}")
         result = self.gen_agent.run(task, force_fail=force_fail)
@@ -371,6 +375,131 @@ class WorkflowEngine:
         )
         log.add(f"[hitl:lead] rejected reason={reason_code.value}")
         log.add(f"[transition] → {task.status.value}")
+
+    @staticmethod
+    def _inject_reject_feedback(task: VisualTask, reason: ReasonCode, notes: str) -> str:
+        """Bake HITL reject into strategy/brief so re-gen prompt carries feedback."""
+        feedback = f"HITL_REJECT[{reason.value}]: {(notes or '').strip() or 'rework'}"
+        if task.strategy:
+            ver = task.strategy.version or "v1"
+            # bump vN → vN+1 when possible
+            if ver.startswith("v") and ver[1:].isdigit():
+                task.strategy.version = f"v{int(ver[1:]) + 1}"
+            else:
+                task.strategy.version = f"{ver}-rework"
+            prev = (task.strategy.composition_notes or "").rstrip()
+            if feedback not in prev:
+                task.strategy.composition_notes = (
+                    f"{prev} | Fix after reject: {feedback}" if prev else f"Fix after reject: {feedback}"
+                )
+            # Brand / business rejects also nudge scene direction
+            if reason in (
+                ReasonCode.BRAND_VIOLATION,
+                ReasonCode.BUSINESS_JUDGEMENT,
+                ReasonCode.AUDIT_BRAND,
+            ):
+                scene = (task.strategy.scene_direction or "").rstrip()
+                if feedback not in scene:
+                    task.strategy.scene_direction = (
+                        f"{scene} | Rework: {feedback}" if scene else f"Rework: {feedback}"
+                    )
+        if task.brief:
+            c = (task.brief.constraints_summary or "").rstrip()
+            if feedback not in c:
+                task.brief.constraints_summary = (
+                    f"{c} | {feedback}" if c else feedback
+                )
+        return feedback
+
+    def rework_from_reject(
+        self,
+        task: VisualTask,
+        log: RunLog,
+        *,
+        qa_overall: Optional[QAOverall] = None,
+        notes: Optional[str] = None,
+    ) -> None:
+        """Rejected → reflow (Strategized|Generating) → gen+QA → HITL gate.
+
+        Uses REASON_DEFAULT_REFLOW for the first hop. Injects reject feedback into
+        strategy/brief so the next generation prompt includes Lead notes.
+        High-risk tasks land PendingReview again; low-risk may auto-approve.
+        """
+        if task.status != TaskStatus.REJECTED:
+            raise RuntimeError(
+                f"Rework only from Rejected (got {task.status.value})"
+            )
+        if not task.review or task.review.decision != ReviewDecisionEnum.REJECTED:
+            raise RuntimeError("Rework requires a reject ReviewDecision on the task")
+
+        reason = task.review.reason_code or ReasonCode.OTHER
+        reject_notes = notes if notes is not None else (task.review.notes or "")
+        target = REASON_DEFAULT_REFLOW.get(reason, TaskStatus.GENERATING)
+        if target not in (TaskStatus.GENERATING, TaskStatus.STRATEGIZED):
+            target = TaskStatus.GENERATING
+
+        feedback = self._inject_reject_feedback(task, reason, reject_notes)
+        task.auto_approved = False
+        task.audit_sampled = False
+        task.block_reason = None
+
+        transition(
+            task,
+            target,
+            "hitl_rework",
+            meta={
+                "reason_code": reason.value,
+                "reflow_to": target.value,
+                "feedback": feedback[:200],
+            },
+        )
+        log.add(
+            f"[hitl:rework] reason={reason.value} → {target.value} "
+            f"feedback={feedback[:120]}"
+        )
+        log.add(f"[transition] → {task.status.value}")
+
+        if target == TaskStatus.STRATEGIZED:
+            if not self.bind_and_gate_knowledge(task, log):
+                log.add("[hitl:rework] stopped at KnowledgePending")
+                return
+            if not self.run_generation(task, log):
+                log.add("[hitl:rework] generation failed")
+                return
+        else:
+            # Rejected → Generating: prior knowledge must still allow Live Gen
+            if task.knowledge_status not in (
+                KnowledgeStatusEnum.READY,
+                KnowledgeStatusEnum.EXEMPTED,
+            ):
+                raise RuntimeError(
+                    "Rework→Generating requires knowledge ready/exempted; "
+                    f"got {task.knowledge_status.value}. "
+                    "Use a Strategized-mapped reason_code (e.g. BRAND_VIOLATION) "
+                    "or restore knowledge first."
+                )
+            if not self.run_generation(task, log):
+                log.add("[hitl:rework] generation failed")
+                return
+
+        # Stub QA defaults to Pass; for structure-sensitive demos keep PassWithRisk
+        # so HITL gate returns to PendingReview (honest rework loop).
+        inject = qa_overall
+        if inject is None and self.config.qa_mode == "stub":
+            if task.requires_forced_review():
+                inject = QAOverall.PASS_WITH_RISK
+            else:
+                inject = QAOverall.PASS
+
+        decision = self.run_qa(task, log, overall=inject)
+        if decision.next_hint == "QAFailed" or task.status == TaskStatus.QA_FAILED:
+            log.add("[hitl:rework] QA failed — stays QAFailed (regen or cancel)")
+            return
+        self.apply_hitl_gate(task, decision, log)
+        log.add(
+            f"[hitl:rework] done status={task.status.value} "
+            f"hint={decision.next_hint}"
+        )
 
     def deliver(self, task: VisualTask, log: RunLog) -> None:
         if task.status != TaskStatus.APPROVED:
@@ -913,7 +1042,8 @@ def scenario_hitl_chat_demo(
     """High-risk path → PendingReview; Feishu chat instructions; NO auto-approve.
 
     Cici / Lead applies decision later via:
-      python3 -m evaw.cli hitl-apply --task <id> --decision approve|reject
+      python3 -m evaw.cli hitl-apply --task <id> --decision approve|reject|rework
+      python3 -m evaw.cli hitl-rework --task <id>
     """
     from datetime import datetime, timedelta, timezone
 

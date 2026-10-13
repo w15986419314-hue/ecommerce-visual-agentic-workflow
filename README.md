@@ -43,6 +43,8 @@
 
 **HITL 策略（不可回退）：** 新品 / `structure_sensitive` / `PassWithRisk`（及知识豁免）→ **强制人审**；其余 QA Pass 可自动通过并抽样审计。
 
+**打回回流：** `PendingReview → Rejected` 后可用 `hitl-rework`（或 `hitl-apply --decision rework`）按 `REASON_DEFAULT_REFLOW` 回到 Generating/Strategized，注入打回反馈再跑 gen+QA；高风险再次 PendingReview。口令见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
+
 ---
 
 ## 三条演示命令
@@ -62,7 +64,7 @@ python3 -m evaw.cli qa-live-demo
 python3 -m evaw.cli evalset-v0
 ```
 
-更多：`live-happy` · `live-knowledge-block` · `feishu-intake` / `feishu-intake-from-json` / `feishu-intake-webhook` / `feishu-bitable-setup` / `feishu-bitable-sync`（真飞书提需：表单→多维表轮询/webhook 建任务）· `feishu-demo` · `hitl-chat-demo` / `hitl-apply`（飞书聊天人审，不代审）· `--live` / `--qa-live`。
+更多：`live-happy` · `live-knowledge-block` · `feishu-intake` / `feishu-intake-from-json` / `feishu-intake-webhook` / `feishu-bitable-setup` / `feishu-bitable-sync`（真飞书提需：表单→多维表轮询/webhook 建任务）· `feishu-demo` · `hitl-chat-demo` / `hitl-apply` / `hitl-rework`（飞书聊天人审 + 打回回流，不代审）· `--live` / `--qa-live`。
 
 值班常驻轮询见下文「值班：多维表轮询」。飞书提需（表单字段 → VisualTask → 通知）见 [`docs/飞书提需说明.md`](docs/%E9%A3%9E%E4%B9%A6%E6%8F%90%E9%9C%80%E8%AF%B4%E6%98%8E.md)。  
 飞书人审（待办含五维 QA / reason_code / 候选图）见 [`docs/飞书人审聊天说明.md`](docs/%E9%A3%9E%E4%B9%A6%E4%BA%BA%E5%AE%A1%E8%81%8A%E5%A4%A9%E8%AF%B4%E6%98%8E.md)。
