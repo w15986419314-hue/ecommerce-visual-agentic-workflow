@@ -98,17 +98,25 @@ knowledge/
 
 ---
 
-## 演示库存（已入库）
+## 正式 ready 知识包（面试可讲）
+
+| sku_id | 品牌 | 结构图 | 用途 |
+|--------|------|--------|------|
+| `folding-bed-01` | brand_xiu | `structure_ref.png` | Live happy 默认 · 真品 I2I |
+| `SKU-BED-STRUCT` | brand_xiu | `structure_ref.png` | 结构敏感 / HITL 强制人审 · I2I 锁参演示 |
+| `sku-bed-01` | YSRJ | `structure_ref.png` | 表单提需试填 · 酒店加床（异品牌 VIS） |
+
+三者均 `status=ready`，含 `manifest.json` + `structure.json` + 平台 refs + 真品结构参考图。
+
+## 演示脚手架（仍入库，非正式作品）
 
 | sku_id | 用途 |
 |--------|------|
-| `SKU-BED-001` | happy path |
-| `sku-bed-01` | 用户表单试填（YSRJ / 酒店加床） |
-| `SKU-BED-STRUCT` | 结构敏感 / 高风险 HITL |
+| `SKU-BED-001` | happy-path 模板；`SKU-BED-*` prefix 继承源 |
 | `SKU-BED-MISSING` | knowledge-block（**必须保持 missing**） |
-| `SKU-BED-FORM-001` / `DEMO` / `NEW` / `BITABLE-001` | 表单与同步试填 |
+| `SKU-BED-FORM-001` / `DEMO` / `NEW` / `BITABLE-001` | 表单与多维表同步试填 |
 
-`catalog.json` 的 prefix 规则：未知的 `SKU-BED-*` / `sku-bed-*`（除 MISSING）在演示环境会继承模板 ready 包，避免再走豁免。正式环境请为每个真实 SKU 建独立目录。
+`catalog.json` 的 prefix 规则：未知的 `SKU-BED-*` / `sku-bed-*`（除 MISSING）在演示环境会继承模板 ready 包，避免再走豁免。正式环境请为每个真实 SKU 建独立目录（见上表三包）。
 
 ---
 

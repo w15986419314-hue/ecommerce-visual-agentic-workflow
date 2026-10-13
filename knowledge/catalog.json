@@ -1,11 +1,12 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "description": "EVAW Knowledge catalog — filesystem source of truth for SKU readiness",
   "root_layout": {
     "platforms": "Shared platform safe-zone / canvas / text rules",
     "brands/<brand_id>/vis.json": "Brand VIS tokens",
     "skus/<sku_id>/manifest.json": "Per-SKU readiness + refs",
-    "skus/<sku_id>/structure.json": "Product structure constraints"
+    "skus/<sku_id>/structure.json": "Product structure constraints",
+    "skus/<sku_id>/structure_ref.png": "Optional real structure photo for I2I"
   },
   "prefix_defaults": [
     {
@@ -28,6 +29,11 @@
       "notes": "Lowercase form variants (e.g. sku-bed-02) inherit sku-bed-01 ready pack in demo."
     }
   ],
+  "formal_ready_skus": [
+    "folding-bed-01",
+    "SKU-BED-STRUCT",
+    "sku-bed-01"
+  ],
   "known_trial_skus": [
     "sku-bed-01",
     "SKU-BED-001",
@@ -35,18 +41,38 @@
     "SKU-BED-FORM-001",
     "SKU-BED-DEMO",
     "SKU-BED-NEW",
-    "SKU-BED-BITABLE-001"
+    "SKU-BED-BITABLE-001",
+    "folding-bed-01"
   ],
   "explicit_skus": {
     "folding-bed-01": {
       "status": "ready",
-      "path": "skus/folding-bed-01"
+      "path": "skus/folding-bed-01",
+      "role": "live-happy default · real product I2I"
+    },
+    "SKU-BED-STRUCT": {
+      "status": "ready",
+      "path": "skus/SKU-BED-STRUCT",
+      "role": "structure-sensitive HITL / I2I lock demo"
+    },
+    "sku-bed-01": {
+      "status": "ready",
+      "path": "skus/sku-bed-01",
+      "role": "YSRJ form-intake hospitality pack"
     }
   },
   "skus": {
     "folding-bed-01": {
       "status": "ready",
       "path": "skus/folding-bed-01"
+    },
+    "SKU-BED-STRUCT": {
+      "status": "ready",
+      "path": "skus/SKU-BED-STRUCT"
+    },
+    "sku-bed-01": {
+      "status": "ready",
+      "path": "skus/sku-bed-01"
     }
   }
 }

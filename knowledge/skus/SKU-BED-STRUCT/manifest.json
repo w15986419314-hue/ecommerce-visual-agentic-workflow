@@ -2,20 +2,25 @@
   "sku_id": "SKU-BED-STRUCT",
   "brand_id": "brand_xiu",
   "status": "ready",
-  "aliases": ["sku-bed-struct"],
-  "title": "结构敏感演示款",
+  "aliases": [
+    "sku-bed-struct",
+    "SKU_BED_STRUCT"
+  ],
+  "title": "酒店加床·结构敏感款（双折）",
   "category": "folding_bed",
+  "structure_sensitive": true,
   "has_vis": true,
   "has_structure": true,
   "has_platform_spec": true,
   "missing_items": [],
   "vis_ref": "brands/brand_xiu/vis.json",
   "structure_ref": "skus/SKU-BED-STRUCT/structure.json",
+  "structure_image": "skus/SKU-BED-STRUCT/structure_ref.png",
   "platform_refs": [
     "platforms/tmall.json",
     "platforms/jd.json",
     "platforms/amazon.json",
     "platforms/dtc.json"
   ],
-  "notes": "Demo/real trial knowledge bundle — enough for Live Gen without exemption"
+  "notes": "Interview formal pack: structure-sensitive dual-fold guest bed (袖羽). Same physical family as folding-bed-01; used for HITL / I2I lock demos. structure_ref.png is real product photo."
 }
