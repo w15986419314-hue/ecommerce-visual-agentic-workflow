@@ -54,6 +54,14 @@
 | GitHub | https://github.com/w15986419314-hue/ecommerce-visual-agentic-workflow |
 | Figma | https://www.figma.com/design/VA5vBY8QfMtfvhUJeZKQPq |
 | 简历站 | https://cici-visual.netlify.app |
+| 面试口述稿 | [`作品集-EVAW-面试口述稿.md`](作品集-EVAW-面试口述稿.md) |
+| 量化讲述 | [`作品集-EVAW-量化与评估讲述.md`](作品集-EVAW-量化与评估讲述.md) |
+| **业务 Case · 主图详情**（同一品） | [`作品集-Case-主图详情.md`](作品集-Case-主图详情.md) |
+| **业务 Case · 短视频**（另一品） | [`作品集-Case-短视频.md`](作品集-Case-短视频.md) |
+
+**与口述对齐：** 主图详情 / 短视频是**两品、两窗、两套证据**；面试分开讲，禁止串成同品故事；业务数字只出现在上述两份 Case，**不混进**下方演示集 KPI。
+
+**飞书运营看板：** 同一 Base 已建「运营看板」视图，按「看板状态」分组（表单提需 → 回写进度）。说明见 [`飞书运营看板说明.md`](飞书运营看板说明.md)。公开可读截图待补：[`assets/`](assets/)（计划 `feishu-ops-kanban.png`），不在此虚构图。
 
 ---
 

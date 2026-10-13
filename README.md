@@ -7,6 +7,21 @@
 
 面向作品集 / 面试可演示的 Python MVP：标准库为主，本地一条命令跑通三条路径；Live Gen / Live QA / 飞书均可切换 stub ↔ live。
 
+## 面试入口
+
+| 材料 | 链接 |
+|------|------|
+| Case 一页 | [`docs/作品集-EVAW-Case一页.md`](docs/作品集-EVAW-Case一页.md) |
+| 面试口述稿 | [`docs/作品集-EVAW-面试口述稿.md`](docs/作品集-EVAW-面试口述稿.md) |
+| 量化与评估讲述 | [`docs/作品集-EVAW-量化与评估讲述.md`](docs/作品集-EVAW-量化与评估讲述.md) |
+| 业务 Case · 主图详情 | [`docs/作品集-Case-主图详情.md`](docs/作品集-Case-主图详情.md) |
+| 业务 Case · 短视频 | [`docs/作品集-Case-短视频.md`](docs/作品集-Case-短视频.md) |
+| Figma 七屏 | [figma.com/design/VA5vBY8QfMtfvhUJeZKQPq](https://www.figma.com/design/VA5vBY8QfMtfvhUJeZKQPq) |
+| 简历站 | [cici-visual.netlify.app](https://cici-visual.netlify.app) |
+
+与口述稿一致：系统闭环与两套业务 Case **分开讲**，数字不混谈。
+
+
 ---
 
 ## 架构示意
