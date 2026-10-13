@@ -68,7 +68,7 @@
 | QA 标签 · PassWithRisk | **33.3%（5/15）** | 强制人审入口 |
 | QA 标签 · Fail | **46.7%（7/15）** | 故意偏多以覆盖五维 |
 | 知识闸阻断 | **演示 1 次** | `knowledge-block` 路径；批量待业务日志 |
-| 人审打回率 | **—** | 本轮无 Reject 统计样本 |
+| 人审打回率 | **闭环样本 n=1**（非业务率） | `task_7717b7a94d`：PendingReview→Rejected(`FIDELITY_STRUCTURE`)→rework→PendingReview；飞书 IM 已通知；看板因 chat-demo 未绑 bitable 行跳过 |
 
 **reason_code Top（Risk+Fail · 演示集）**
 

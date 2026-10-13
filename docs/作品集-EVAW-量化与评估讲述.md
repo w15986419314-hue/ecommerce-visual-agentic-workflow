@@ -100,7 +100,7 @@ evalset=v0 engine=rules cases=15 matched=15 pass_rate=100.0%
 
 **知识闸阻断次数（演示路径）**：本轮 `knowledge-block` **1** 次明确阻断（非批量业务统计）。
 
-**人审打回率**：演示集 / 本轮 stub 路径以 Lead **批准** 为主，**无** 足够 Reject 样本可报业务打回率 → Case 表填「— / 待真实人审样本」。
+**人审打回率**：尚无批量业务统计，**不填虚假 %**。已补 **闭环样本 n=1**（2026-10-13 SGT）：`task_7717b7a94d` · stub gen + 飞书 live IM · `hitl-chat-demo` → `hitl-apply --decision reject --reason FIDELITY_STRUCTURE` → `hitl-rework` → 再次 **PendingReview**（strategy v2 已注入 `HITL_REJECT[FIDELITY_STRUCTURE]`）。看板：chat-demo 未写 bitable `synced_record_ids`，`try_push` 跳过（诚实边界）。Case 表写「闭环样本 n=1」，勿口述成线上打回率。
 
 ---
 
@@ -141,7 +141,7 @@ Knowledge ≠ ready    → 阻断 Live Gen（本轮 demo 已验证）
 | Fail 占比 | **46.7%（7/15）** |
 | 另增一行更佳 | **期望对齐率 100%（15/15）** · `evalset-v0` |
 | 知识闸阻断 | **演示路径 1 次**（`knowledge-block`）；批量待业务日志 |
-| 人审打回率 | **—**（本轮无 Reject 统计） |
+| 人审打回率 | **闭环样本 n=1** · `task_7717b7a94d` Reject→rework→PendingReview（非业务 %） |
 | 打回原因 Top | 用演示集 reason：**保真 / 文案 / 移动 / 品牌 / 版式**（各 2–3 次） |
 
 口述开场建议：先报 **对齐率 100%**（规则可信），再报 **标签分布**（人审入口占比），最后一句边界：**「这是演示集，不是线上 KPI。」**
