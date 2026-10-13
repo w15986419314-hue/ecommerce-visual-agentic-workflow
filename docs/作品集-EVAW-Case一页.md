@@ -57,27 +57,28 @@
 
 ---
 
-## 量化（演示集 · 待填，无虚构指标）
+## 量化（演示集 · 2026-10-13 实跑，无虚构业务 KPI）
 
-> 以下为 **演示集 / 评估集 v0** 假设位，面试前用真实跑数填入；**勿编造通过率**。
+> 来源：`python3 -m evaw.cli evalset-v0`（15 fixture 用例）。**标签分布 ≠ 线上通过率**；详述见 `docs/作品集-EVAW-量化与评估讲述.md`。
 
 | 指标 | 演示集结果 | 备注 |
 |------|------------|------|
-| QA 通过率（Pass） | ___% | `evalset-v0` / 现场跑数 |
-| PassWithRisk 占比 | ___% | 强制人审入口 |
-| Fail 占比 | ___% | |
-| 知识闸阻断次数 | ___ | Knowledge≠ready |
-| 人审打回率 | ___% | 已批准样本中 |
+| 期望对齐率 | **100%（15/15）** | 规则 overall/reason 与期望一致（CLI `pass_rate`） |
+| QA 标签 · Pass | **20%（3/15）** | 演示集设计占比，非业务通过率 |
+| QA 标签 · PassWithRisk | **33.3%（5/15）** | 强制人审入口 |
+| QA 标签 · Fail | **46.7%（7/15）** | 故意偏多以覆盖五维 |
+| 知识闸阻断 | **演示 1 次** | `knowledge-block` 路径；批量待业务日志 |
+| 人审打回率 | **—** | 本轮无 Reject 统计样本 |
 
-**打回原因骨架（填 Top）**
+**reason_code Top（Risk+Fail · 演示集）**
 
 | reason_code / 原因 | 次数 | 处理 |
 |--------------------|------|------|
-| product_fidelity | | |
-| brand / VIS | | |
-| text / 平台文案 | | |
-| layout / mobile | | |
-| 其他 | | |
+| FIDELITY_STRUCTURE / 保真 | 3 | 强制人审或 Fail 打回再审 |
+| TEXT_ERROR / 文案 | 3 | 补卖点 / 去占位 / 改宣称 |
+| MOBILE_READABILITY | 2 | 移动可读性人审或 Fail |
+| BRAND_VIOLATION / VIS | 2 | 软 Risk 人审；硬 Fail 阻断 |
+| LAYOUT_PLATFORM | 2 | 尺寸/安全区修正 |
 
 ---
 
