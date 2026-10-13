@@ -460,3 +460,132 @@ def assert_may_generate(task: VisualTask) -> None:
         f"Live Generation blocked: knowledge_status={ks.value} "
         f"(only ready|exempted with ticket allowed)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Structure / VIS constraints for generation prompts + I2I
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class StructureConstraints:
+    sku_id: str
+    must_show: list[str] = field(default_factory=list)
+    must_not: list[str] = field(default_factory=list)
+    materials: list[str] = field(default_factory=list)
+    views: list[str] = field(default_factory=list)
+    structure_image: Optional[Path] = None
+    structure_json_path: Optional[Path] = None
+    platform_notes: list[str] = field(default_factory=list)
+    brand_forbidden: list[str] = field(default_factory=list)
+    product_name: Optional[str] = None
+    structure_sensitive: bool = False
+
+
+def _manifest_for_sku(sku_id: str) -> tuple[Optional[Path], Optional[dict[str, Any]]]:
+    """Return (sku_dir, manifest) for a catalogued SKU, or (None, None)."""
+    root = knowledge_root()
+    if not root.is_dir():
+        return None, None
+    index = load_sku_catalog(str(root))
+    entry = index.get(normalize_sku_key(sku_id))
+    if entry is None:
+        entry = _apply_prefix_defaults(root, sku_id, index)
+    if entry is None or not entry.source_path or entry.source_path == "DEMO_SKU_KNOWLEDGE":
+        # Try direct folder name
+        direct = root / "skus" / sku_id
+        if direct.is_dir():
+            manifest = _read_json(direct / "manifest.json")
+            return (direct, manifest) if manifest else (None, None)
+        return None, None
+    sku_dir = root / entry.source_path
+    if not sku_dir.is_dir():
+        # source_path may be relative like skus/folding-bed-01
+        alt = root / str(entry.source_path)
+        sku_dir = alt if alt.is_dir() else sku_dir
+    manifest = _read_json(sku_dir / "manifest.json") if sku_dir.is_dir() else None
+    if not manifest:
+        return None, None
+    return sku_dir, manifest
+
+
+def load_structure_constraints(sku_id: str, platform: Optional[str] = None) -> StructureConstraints:
+    """Load must_show / must_not / materials / structure_ref image for prompt + I2I."""
+    root = knowledge_root()
+    sku_dir, manifest = _manifest_for_sku(sku_id)
+    out = StructureConstraints(sku_id=sku_id)
+    if not sku_dir or not manifest:
+        return out
+
+    struct_rel = manifest.get("structure_ref")
+    struct_path: Optional[Path] = None
+    if struct_rel:
+        candidate = root / str(struct_rel)
+        if candidate.is_file():
+            struct_path = candidate
+        elif (sku_dir / "structure.json").is_file():
+            struct_path = sku_dir / "structure.json"
+    elif (sku_dir / "structure.json").is_file():
+        struct_path = sku_dir / "structure.json"
+
+    structure: dict[str, Any] = {}
+    if struct_path and struct_path.is_file():
+        loaded = _read_json(struct_path)
+        if loaded:
+            structure = loaded
+            out.structure_json_path = struct_path
+
+    out.must_show = [str(x) for x in (structure.get("must_show") or []) if str(x).strip()]
+    out.must_not = [str(x) for x in (structure.get("must_not") or []) if str(x).strip()]
+    out.materials = [str(x) for x in (structure.get("materials") or []) if str(x).strip()]
+    out.views = [
+        str(x)
+        for x in (structure.get("views") or structure.get("camera_refs") or [])
+        if str(x).strip()
+    ]
+    out.product_name = (
+        str(structure["product_name"]).strip()
+        if structure.get("product_name")
+        else (str(manifest.get("title") or "").strip() or None)
+    )
+    out.structure_sensitive = bool(
+        manifest.get("structure_sensitive") or structure.get("structure_sensitive")
+    )
+
+    # Prefer manifest.structure_image, else structure.reference_image next to structure.json
+    img: Optional[Path] = None
+    img_rel = manifest.get("structure_image")
+    if img_rel:
+        cand = root / str(img_rel)
+        if cand.is_file():
+            img = cand
+    if img is None:
+        ref_name = structure.get("reference_image") or "structure_ref.png"
+        cand2 = sku_dir / str(ref_name)
+        if cand2.is_file():
+            img = cand2
+    out.structure_image = img
+
+    # Platform safe-zone / text rules
+    plat = (platform or "").strip().lower()
+    if plat:
+        plat_path = root / "platforms" / f"{plat}.json"
+        plat_data = _read_json(plat_path)
+        if plat_data:
+            safe = plat_data.get("safe_zone") or {}
+            if isinstance(safe, dict) and safe.get("notes"):
+                out.platform_notes.append(str(safe["notes"]))
+            for rule in plat_data.get("text_rules") or []:
+                out.platform_notes.append(str(rule))
+            canvas = plat_data.get("hero_canvas") or {}
+            if isinstance(canvas, dict) and canvas.get("recommended"):
+                out.platform_notes.append(f"推荐画布 {canvas['recommended']}")
+
+    # Brand forbidden from VIS
+    vis_rel = manifest.get("vis_ref")
+    if vis_rel:
+        vis = _read_json(root / str(vis_rel))
+        if vis:
+            out.brand_forbidden = [str(x) for x in (vis.get("forbidden") or []) if str(x).strip()]
+
+    return out

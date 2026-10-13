@@ -1,0 +1,48 @@
+{
+  "version": "1.0",
+  "fields": {
+    "kanban": "看板状态",
+    "task_id": "EVAW任务ID",
+    "raw_status": "EVAW状态",
+    "qa": "QA结果",
+    "updated_at": "状态更新时间"
+  },
+  "columns": [
+    "待策略",
+    "策略完成",
+    "待补知识",
+    "知识就绪",
+    "生成中",
+    "生成失败",
+    "质检中",
+    "质检未过",
+    "质检通过",
+    "质检有风险",
+    "待人审",
+    "已批准",
+    "已打回",
+    "已交付",
+    "已反馈",
+    "已取消"
+  ],
+  "status_to_kanban": {
+    "Draft": "待策略",
+    "ReadyForStrategy": "待策略",
+    "Strategized": "策略完成",
+    "KnowledgePending": "待补知识",
+    "KnowledgeReady": "知识就绪",
+    "Generating": "生成中",
+    "GenerationFailed": "生成失败",
+    "QAPending": "质检中",
+    "QAFailed": "质检未过",
+    "QAPassed": "质检通过",
+    "QAPassedWithRisk": "质检有风险",
+    "PendingReview": "待人审",
+    "Approved": "已批准",
+    "Rejected": "已打回",
+    "Delivered": "已交付",
+    "FeedbackLinked": "已反馈",
+    "Cancelled": "已取消"
+  },
+  "notes": "运营看板按「看板状态」建看板视图即可；EVAW 细状态写在「EVAW状态」；提需表单字段不变，本套为回写进度列。"
+}

@@ -62,16 +62,17 @@ def _deadline_days(n: int = 7) -> datetime:
 
 
 def ops_happy() -> OperationsInput:
+    # folding-bed-01: structure_sensitive + structure_ref → system locks I2I params
     return OperationsInput(
         brand_id="brand_xiu",
-        sku_id="SKU-BED-001",
+        sku_id="folding-bed-01",
         platform=Platform.TMALL,
         asset_type=AssetType.HERO,
         selling_points=["稳固承重", "快速折叠", "客房场景"],
         size_spec="800x800",
         deadline=_deadline_days(),
         is_new_product=False,
-        risk_flags=[],
+        risk_flags=[STRUCTURE_SENSITIVE],
         created_by="ops_demo",
     )
 
@@ -442,6 +443,17 @@ def run_hitl_apply(
 
     snap = save_task(task, hitl_dir)
     log.add(f"[hitl:store] updated={snap}")
+    try:
+        from .feishu.kanban_sync import try_push_after_status_change
+
+        kr = try_push_after_status_change(task.task_id, artifacts_dir=artifacts_dir)
+        if kr:
+            log.add(
+                f"[kanban] ok={kr.get('ok')} "
+                f"kanban={(kr.get('fields') or {}).get('看板状态') or kr.get('error')}"
+            )
+    except Exception as e:  # noqa: BLE001
+        log.add(f"[kanban] skip error={e}")
     log.add(f"=== DONE status={task.status.value} ===")
     log.add(f"[trace] {log.status_trace(task)}")
 
@@ -658,6 +670,72 @@ def run_feishu_bitable_sync(
 
 
 
+
+def run_feishu_kanban_sync(
+    *,
+    artifacts_dir: str = "artifacts",
+    app_token: str | None = None,
+    table_id: str | None = None,
+    task_id: str | None = None,
+    all_synced: bool = False,
+    ensure_fields: bool = False,
+    dry_run: bool = False,
+    show_map: bool = False,
+) -> int:
+    """Push EVAW task status → Feishu bitable Kanban columns (ops board)."""
+    import json
+    from .feishu.kanban_map import mapping_as_dict, mapping_table_rows
+    from .feishu.kanban_sync import (
+        ensure_kanban_fields,
+        push_all_synced,
+        push_task_status,
+    )
+
+    _load_env_local()
+    if show_map:
+        print(json.dumps(mapping_as_dict(), ensure_ascii=False, indent=2))
+        print()
+        for row in mapping_table_rows():
+            print(f"{row['evaw_status']:24} → {row['kanban_zh']}")
+        return 0
+
+    if ensure_fields and not task_id and not all_synced:
+        report = ensure_kanban_fields(
+            app_token=app_token, table_id=table_id, dry_run=dry_run
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report.get("ok") else 1
+
+    if all_synced or (not task_id and ensure_fields):
+        report = push_all_synced(
+            artifacts_dir=artifacts_dir,
+            app_token=app_token,
+            table_id=table_id,
+            dry_run=dry_run,
+            ensure_fields=ensure_fields,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report.get("ok") else 1
+
+    if not task_id:
+        print(
+            "Specify --task TASK_ID, --all, --ensure-fields, or --map",
+            file=sys.stderr,
+        )
+        return 2
+
+    report = push_task_status(
+        task_id,
+        artifacts_dir=artifacts_dir,
+        app_token=app_token,
+        table_id=table_id,
+        dry_run=dry_run,
+        ensure_fields=ensure_fields,
+    )
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return 0 if report.get("ok") else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     _load_env_local()
     argv_list = list(argv) if argv is not None else sys.argv[1:]
@@ -731,6 +809,52 @@ def main(argv: list[str] | None = None) -> int:
             table_id=a.table_id,
             include_synced=a.include_synced,
         )
+
+
+    # Dedicated: feishu-kanban-sync — EVAW status → Feishu ops Kanban columns
+    if argv_list and argv_list[0] == "feishu-kanban-sync":
+        p = argparse.ArgumentParser(
+            prog="evaw.cli feishu-kanban-sync",
+            description=(
+                "Push EVAW task status to Feishu 多维表格 Kanban columns "
+                "(看板状态 / EVAW任务ID / …). Same base as bitable intake. "
+                "Does not send IM."
+            ),
+        )
+        p.add_argument("--artifacts-dir", default="artifacts")
+        p.add_argument("--app-token", default=None)
+        p.add_argument("--table-id", default=None)
+        p.add_argument("--task", dest="task_id", default=None, help="One task_id")
+        p.add_argument(
+            "--all",
+            dest="all_synced",
+            action="store_true",
+            help="Push all record↔task pairs in sync state",
+        )
+        p.add_argument(
+            "--ensure-fields",
+            action="store_true",
+            help="Create 看板状态 etc. columns if missing",
+        )
+        p.add_argument("--dry-run", action="store_true")
+        p.add_argument(
+            "--map",
+            dest="show_map",
+            action="store_true",
+            help="Print EVAW status → 看板状态 mapping and exit",
+        )
+        a = p.parse_args(argv_list[1:])
+        return run_feishu_kanban_sync(
+            artifacts_dir=a.artifacts_dir,
+            app_token=a.app_token,
+            table_id=a.table_id,
+            task_id=a.task_id,
+            all_synced=a.all_synced,
+            ensure_fields=a.ensure_fields,
+            dry_run=a.dry_run,
+            show_map=a.show_map,
+        )
+
 
 
     # Dedicated: feishu-intake-from-json — webhook/bitable payload → task

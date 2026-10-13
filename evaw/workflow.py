@@ -172,6 +172,19 @@ class WorkflowEngine:
         result = self.gen_agent.run(task, force_fail=force_fail)
         task.generation = result
         task.current_generation_result_id = result.generation_result_id
+        meta = getattr(self.gen_agent, "last_provider_meta", None) or {}
+        if meta.get("fallback_from"):
+            log.add(
+                f"[gen:fallback] from={meta.get('fallback_from')} "
+                f"primary_error={meta.get('primary_error_code')} "
+                f"msg={meta.get('primary_error_message')}"
+            )
+        elif meta.get("kind"):
+            log.add(
+                f"[gen:provider] kind={meta.get('kind')} "
+                f"external_api={meta.get('external_api')} "
+                f"model={meta.get('model')}"
+            )
 
         if result.status.value == "failed":
             transition(task, TaskStatus.GENERATION_FAILED, "generation_failed")

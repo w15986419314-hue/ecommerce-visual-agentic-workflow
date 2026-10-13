@@ -16,6 +16,7 @@ from typing import Optional
 
 from ..schema import GeneratedAsset, new_id
 from .base import GenerationProvider, ProviderGenerateRequest, ProviderGenerateResult
+from .prompt import build_ecommerce_prompt
 
 DEFAULT_MODEL = os.environ.get("EVAW_OPENAI_IMAGE_MODEL", "gpt-image-1")
 DEFAULT_SIZE = os.environ.get("EVAW_OPENAI_IMAGE_SIZE", "1024x1024")
@@ -25,20 +26,7 @@ API_URL = os.environ.get(
 
 
 def _build_prompt(req: ProviderGenerateRequest) -> str:
-    strategy = req.task.strategy
-    scene = strategy.scene_direction if strategy else ""
-    composition = strategy.composition_notes if strategy else ""
-    selling = (
-        ", ".join(strategy.selling_point_priority) if strategy else ""
-    )
-    return (
-        f"Ecommerce product hero image for SKU {req.task.sku_id} "
-        f"(brand {req.task.brand_id}), platform {req.task.platform.value}. "
-        f"Mode: {req.mode.value}. Scene: {scene}. "
-        f"Composition: {composition}. Selling points: {selling}. "
-        "Photorealistic, product-accurate structure, marketplace-safe framing, "
-        "no fake logos or unreadable text."
-    )
+    return build_ecommerce_prompt(req, lang="en", max_chars=900)
 
 
 class OpenAIImagesProvider(GenerationProvider):

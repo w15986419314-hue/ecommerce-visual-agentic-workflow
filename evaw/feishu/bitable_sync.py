@@ -312,6 +312,25 @@ def sync_once(
                 "intake_id": result.get("intake_id"),
                 "synced_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             }
+            tid = result.get("task_id")
+            if tid:
+                try:
+                    from .kanban_sync import push_task_status
+
+                    kr = push_task_status(
+                        str(tid),
+                        artifacts_dir=artifacts_dir,
+                        app_token=app,
+                        table_id=table,
+                        record_id=rid,
+                    )
+                    synced[rid]["kanban"] = (kr.get("fields") or {}).get("看板状态")
+                    synced[rid]["kanban_ok"] = bool(kr.get("ok"))
+                    if kr.get("error"):
+                        synced[rid]["kanban_error"] = kr.get("error")
+                except Exception as ke:  # noqa: BLE001
+                    synced[rid]["kanban_ok"] = False
+                    synced[rid]["kanban_error"] = str(ke)
 
     from datetime import datetime, timezone
 

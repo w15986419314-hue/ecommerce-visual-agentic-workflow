@@ -124,7 +124,7 @@ class SimulatedLiveGenerationProvider(GenerationProvider):
             "candidates": meta_candidates,
             "note": (
                 "Simulated live — no external image API called. "
-                "Set OPENAI_API_KEY (or other supported key) for real Live Gen."
+                "Set ARK_API_KEY (豆包 Seedream / 火山方舟, preferred in CN), or DASHSCOPE_API_KEY / OPENAI_API_KEY for real Live Gen."
             ),
         }
         manifest_path = run_dir / "candidates.json"

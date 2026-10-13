@@ -18,6 +18,8 @@ from .field_map import INTAKE_FIELDS, field_map_as_dict, payload_to_brief
 from .webhook import ingest_payload, serve_webhook
 from .bitable_setup import setup_bitable, write_field_map_doc
 from .bitable_sync import sync_once, poll_loop, DEFAULT_FORM_URL, DEFAULT_APP_TOKEN
+from .kanban_map import STATUS_TO_KANBAN, kanban_label, mapping_as_dict
+from .kanban_sync import ensure_kanban_fields, push_task_status, push_all_synced
 
 
 def has_feishu_credentials() -> bool:
@@ -101,4 +103,10 @@ __all__ = [
     "poll_loop",
     "DEFAULT_FORM_URL",
     "DEFAULT_APP_TOKEN",
+    "STATUS_TO_KANBAN",
+    "kanban_label",
+    "mapping_as_dict",
+    "ensure_kanban_fields",
+    "push_task_status",
+    "push_all_synced",
 ]

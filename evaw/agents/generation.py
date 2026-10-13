@@ -49,6 +49,7 @@ class AssetGenerationAgent:
         self.gen_mode: GenMode = gen_mode
         self.provider = provider or build_provider(gen_mode)
         self.artifacts_dir = Path(artifacts_dir or DEFAULT_ARTIFACTS_DIR)
+        self.last_provider_meta: dict = {}
 
     def provider_summary(self) -> str:
         return describe_provider_choice(self.gen_mode, self.provider)
@@ -106,6 +107,7 @@ class AssetGenerationAgent:
             artifacts_dir=self.artifacts_dir,
         )
         prov = self.provider.generate(req)
+        self.last_provider_meta = dict(prov.provider_meta or {})
 
         if not prov.ok:
             return GenerationResult(

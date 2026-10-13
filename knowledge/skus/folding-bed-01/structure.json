@@ -18,5 +18,12 @@
     "折叠过程",
     "客房场景"
   ],
-  "reference_image": "structure_ref.png"
+  "reference_image": "structure_ref.png",
+  "materials": [
+    "白金属框架",
+    "白色绗缝床面",
+    "深灰侧围",
+    "黑色脚垫与锁紧旋钮"
+  ],
+  "structure_sensitive": true
 }
